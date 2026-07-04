@@ -26,6 +26,20 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        :focus-visible {
+            outline: 2px solid var(--accent-purple);
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
         body {
             background-color: var(--bg-color);
             background-image:
@@ -256,6 +270,7 @@
             flex-grow: 1;
             overflow-y: auto;
             min-height: 420px;
+            max-height: calc(100vh - 260px);
             font-size: 1.05rem;
             line-height: 1.6;
             white-space: pre-wrap;
@@ -315,12 +330,19 @@
         }
 
         .result-actions {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
+            position: sticky;
+            top: -1.5rem;
+            margin: -1.5rem -1.5rem 0.75rem;
+            padding: 1rem 1.5rem 0.75rem;
             z-index: 10;
             display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            align-items: center;
             gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--card-border);
         }
 
         .copy-btn {
@@ -337,6 +359,7 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            min-height: 44px;
         }
 
         .copy-btn:hover {
@@ -349,6 +372,133 @@
             background: rgba(16, 185, 129, 0.15);
             border-color: var(--success-green);
             color: #065f46;
+        }
+
+        .copy-btn.primary-action {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.3);
+        }
+
+        .copy-btn.primary-action:hover {
+            filter: brightness(1.1);
+        }
+
+        .placeholder-chip {
+            background: rgba(180, 83, 9, 0.14);
+            color: #92400e;
+            border-radius: 4px;
+            padding: 0.05em 0.35em;
+            font-weight: 600;
+        }
+
+        .placeholder-warning {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #92400e;
+            background: rgba(180, 83, 9, 0.1);
+            border: 1px solid rgba(180, 83, 9, 0.25);
+            border-radius: 10px;
+            padding: 0.5rem 0.85rem;
+            margin-right: auto;
+        }
+
+        .delta-bar {
+            margin-bottom: 1.25rem;
+            padding: 1rem 1.25rem;
+            background: rgba(16, 185, 129, 0.06);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-left: 4px solid var(--success-green);
+            border-radius: 12px;
+        }
+
+        .delta-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .delta-chip {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #065f46;
+            background: rgba(16, 185, 129, 0.14);
+            border-radius: 20px;
+            padding: 0.3rem 0.75rem;
+        }
+
+        .delta-chip.warning {
+            color: #92400e;
+            background: rgba(180, 83, 9, 0.14);
+        }
+
+        .delta-toggle {
+            background: none;
+            border: none;
+            color: var(--success-green);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.6rem 0;
+            min-height: 44px;
+        }
+
+        .delta-toggle .chevron {
+            display: inline-block;
+            transition: transform 0.2s ease;
+        }
+
+        .delta-toggle[aria-expanded="true"] .chevron {
+            transform: rotate(90deg);
+        }
+
+        .chip-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .chip {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-height: 44px;
+        }
+
+        .chip:hover {
+            border-color: rgba(139, 92, 246, 0.4);
+            color: var(--text-primary);
+        }
+
+        .chip.selected {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            border-color: transparent;
+            color: #fff;
+        }
+
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.6rem;
+            margin-top: 1.25rem;
+        }
+
+        .control-row-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            flex-shrink: 0;
         }
 
         .loader {
@@ -389,8 +539,8 @@
             background: rgba(15, 23, 42, 0.05);
             border: 1px solid var(--card-border);
             border-radius: 10px;
-            width: 36px;
-            height: 36px;
+            width: 44px;
+            height: 44px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -469,6 +619,7 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 0;
+            min-height: 44px;
         }
 
         .history-toggle .chevron {
@@ -556,15 +707,19 @@
         .technique-option {
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.5rem;
             font-size: 0.85rem;
             color: var(--text-secondary);
             cursor: pointer;
+            padding: 0.5rem 0.25rem;
+            min-height: 44px;
         }
 
         .technique-option input {
             accent-color: var(--accent-purple);
             cursor: pointer;
+            width: 18px;
+            height: 18px;
         }
 
         .field-error {
@@ -731,7 +886,7 @@
             <span class="logo-icon">✨</span> Prompt Optimizer
         </div>
         <div class="header-meta">
-            <div class="info-pill" id="modelPill" onclick="openSettings()">Loading...</div>
+            <div class="info-pill" id="modelPill" onclick="openSettings()" title="The engine generating your optimized prompt — click to bring your own API key">Loading...</div>
             <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
         </div>
     </header>
@@ -745,29 +900,42 @@
             <div class="field-error" id="promptError">Please enter a prompt to optimize.</div>
 
             <div class="technique-row">
-                <label class="technique-option"><input type="checkbox" class="technique-checkbox" value="cot"> Chain-of-thought</label>
-                <label class="technique-option"><input type="checkbox" class="technique-checkbox" value="fewshot"> Few-shot examples</label>
-                <label class="technique-option"><input type="checkbox" class="technique-checkbox" value="xml"> XML structure</label>
-                <label class="technique-option"><input type="checkbox" class="technique-checkbox" value="placeholders"> Variable placeholders</label>
+                <label class="technique-option" title="Instructs the AI to reason step-by-step before giving its final answer."><input type="checkbox" class="technique-checkbox" value="cot"> Chain-of-thought</label>
+                <label class="technique-option" title="Instructs the AI to include example input/output pairs in the optimized prompt."><input type="checkbox" class="technique-checkbox" value="fewshot"> Few-shot examples</label>
+                <label class="technique-option" title="Structures the prompt's sections with XML tags (e.g. <context>, <task>) for clearer parsing."><input type="checkbox" class="technique-checkbox" value="xml"> XML structure</label>
+                <label class="technique-option" title="Adds {{variable}} placeholders for values you'll fill in before using the prompt."><input type="checkbox" class="technique-checkbox" value="placeholders"> Variable placeholders</label>
+            </div>
+
+            <div class="control-row">
+                <span class="control-row-label">Length:</span>
+                <div class="chip-group" id="lengthChips" title="How long the rewritten prompt itself should be, independent of the style chosen below">
+                    <button type="button" class="chip" data-value="concise" onclick="selectChip('lengthChips', this)">Concise</button>
+                    <button type="button" class="chip selected" data-value="standard" onclick="selectChip('lengthChips', this)">Standard</button>
+                    <button type="button" class="chip" data-value="full" onclick="selectChip('lengthChips', this)">Full</button>
+                </div>
+                <input type="hidden" id="length" value="standard">
+            </div>
+            <div class="field-hint" id="lengthHint">Standard: proportionate length — expands only what clarity requires.</div>
+
+            <div class="control-row">
+                <span class="control-row-label">Optimize for:</span>
+                <div class="chip-group" id="targetChips" title="Which model the optimized prompt is written for">
+                    <button type="button" class="chip selected" data-value="" onclick="selectChip('targetChips', this)">Generic</button>
+                    <button type="button" class="chip" data-value="claude" onclick="selectChip('targetChips', this)">Claude</button>
+                    <button type="button" class="chip" data-value="gpt" onclick="selectChip('targetChips', this)">GPT</button>
+                    <button type="button" class="chip" data-value="gemini" onclick="selectChip('targetChips', this)">Gemini</button>
+                    <button type="button" class="chip" data-value="local" onclick="selectChip('targetChips', this)">Small Local</button>
+                </div>
+                <input type="hidden" id="targetModel" value="">
             </div>
 
             <div class="controls">
                 <div class="select-wrapper">
-                    <select id="strength">
+                    <select id="strength" onchange="updateStrengthHint()">
                         <option value="balanced">Balanced Optimize</option>
                         <option value="concise">Concise Focus</option>
                         <option value="detailed">Detailed Structure</option>
                         <option value="critique">Critique Only</option>
-                    </select>
-                </div>
-                <div class="select-wrapper">
-                    <select id="targetModel" title="Which model the optimized prompt is written for">
-                        <option value="">Any Model</option>
-                        <option value="claude">Claude</option>
-                        <option value="gpt">GPT</option>
-                        <option value="gemini">Gemini</option>
-                        <option value="local">Small Local Model</option>
-                        <option value="generic">Generic</option>
                     </select>
                 </div>
                 <button class="btn" id="optimizeBtn" onclick="optimizePrompt()" disabled>
@@ -775,6 +943,7 @@
                     <span id="btnText">Optimize Prompt</span>
                 </button>
             </div>
+            <div class="field-hint" id="strengthHint">Strikes an even balance between conciseness, clarity, and contextual detail.</div>
 
             <div class="history-section">
                 <div class="history-header">
@@ -790,8 +959,16 @@
         <!-- Output Panel -->
         <div class="panel">
             <h2><span class="icon">🚀</span> Optimized Result</h2>
+
+            <div class="delta-bar" id="deltaBar" style="display: none;">
+                <div class="delta-chips" id="deltaChips"></div>
+                <button class="delta-toggle" id="deltaToggle" onclick="toggleDelta()" aria-expanded="false" aria-controls="explanationSection">
+                    <span class="chevron">▶</span> <span>Why this is better</span>
+                </button>
+            </div>
+
             <div class="output-container">
-                <div class="output-box" id="outputBox">
+                <div class="output-box" id="outputBox" aria-live="polite">
                     <div class="output-placeholder" id="placeholderText">
                         <span class="placeholder-icon">🪄</span>
                         <div>Optimized output will appear here after optimization completes.</div>
@@ -903,9 +1080,9 @@
             const settings = loadSettings();
             const pill = document.getElementById("modelPill");
             if (settings.apiKey && settings.provider) {
-                pill.innerText = `${settings.provider}: ${settings.model || "default"}`;
+                pill.innerText = `Engine: ${settings.provider} (${settings.model || "default"})`;
             } else {
-                pill.innerText = "Using shared hosted key (click to configure your own)";
+                pill.innerText = "Engine: shared hosted key (click to configure your own)";
             }
         }
 
@@ -959,8 +1136,47 @@
             };
         }
 
+        const LENGTH_HINTS = {
+            concise: "Concise: keep the rewritten prompt tight — close to the input's length, no padding.",
+            standard: "Standard: proportionate length — expands only what clarity requires.",
+            full: "Full: expand freely with comprehensive context, instructions, and edge cases.",
+        };
+
+        const STRENGTH_HINTS = {
+            balanced: "Strikes an even balance between conciseness, clarity, and contextual detail.",
+            concise: "Favors a tight, direct structure — trims anything not essential to the task.",
+            detailed: "Expands with thorough context, edge cases, and explicit constraints.",
+            critique: "Doesn't rewrite the prompt — scores it and lists concrete weaknesses instead.",
+        };
+
+        function updateStrengthHint() {
+            const strength = document.getElementById("strength").value;
+            document.getElementById("strengthHint").innerText = STRENGTH_HINTS[strength] || STRENGTH_HINTS.balanced;
+        }
+
+        function selectChip(groupId, el) {
+            const group = document.getElementById(groupId);
+            group.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
+            el.classList.add("selected");
+            const value = el.dataset.value || "";
+            if (groupId === "lengthChips") {
+                document.getElementById("length").value = value;
+                document.getElementById("lengthHint").innerText = LENGTH_HINTS[value] || LENGTH_HINTS.standard;
+            } else if (groupId === "targetChips") {
+                document.getElementById("targetModel").value = value;
+            }
+        }
+
+        function setChipGroupValue(groupId, value) {
+            const group = document.getElementById(groupId);
+            const chips = Array.from(group.querySelectorAll(".chip"));
+            const match = chips.find((c) => (c.dataset.value || "") === (value || "")) || chips[0];
+            if (match) selectChip(groupId, match);
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             refreshModelPill();
+            updateStrengthHint();
 
             const rawPromptEl = document.getElementById("rawPrompt");
             const charCountEl = document.getElementById("charCount");
@@ -986,6 +1202,7 @@
                 requestBody.strength = strength;
                 const techniques = Array.from(document.querySelectorAll(".technique-checkbox:checked")).map(cb => cb.value);
                 if (techniques.length) requestBody.techniques = techniques;
+                requestBody.length = document.getElementById("length").value || "standard";
             }
             if (targetModel) requestBody.target_model = targetModel;
             return requestBody;
@@ -1079,6 +1296,7 @@
                     explanation: doneData.explanation,
                     strength: strength,
                     targetModel: targetModel,
+                    length: requestBody.length,
                     model: doneData.model,
                     timestamp: Date.now()
                 });
@@ -1101,6 +1319,7 @@
                             explanation: data.explanation,
                             strength: strength,
                             targetModel: targetModel,
+                            length: requestBody.length,
                             model: data.model,
                             timestamp: Date.now()
                         });
@@ -1145,27 +1364,82 @@
             currentRawPrompt = rawPromptForDiff !== undefined ? rawPromptForDiff : document.getElementById("rawPrompt").value;
             diffModeOn = false;
 
+            const placeholderCount = countPlaceholders(currentOptimizedText);
+            const warningHtml = placeholderCount
+                ? `<span class="placeholder-warning">⚠ ${placeholderCount} placeholder${placeholderCount === 1 ? "" : "s"} to fill before copying</span>`
+                : "";
+
             outputBox.innerHTML = `
                 <div class="result-actions">
+                    ${warningHtml}
                     <button class="copy-btn copy-action" onclick="copyToClipboard()"><span class="btn-icon">📋</span> Copy</button>
                     <button class="copy-btn save-action" onclick="saveToLibrary()"><span class="btn-icon">💾</span> Save</button>
                     <button class="copy-btn diff-action" onclick="toggleDiffView()"><span class="btn-icon">🔀</span> Diff</button>
-                    <button class="copy-btn test-action" onclick="showTestSection()"><span class="btn-icon">⚖️</span> Test Both</button>
+                    <button class="copy-btn primary-action test-action" onclick="showTestSection()"><span class="btn-icon">⚖️</span> Test Both</button>
                 </div>
-                <div id="optimizedText" style="padding-top: 2rem; font-family: inherit; font-size: inherit; line-height: inherit; color: var(--text-primary);">${escapeHtml(currentOptimizedText)}</div>
+                <div id="optimizedText" style="font-family: inherit; font-size: inherit; line-height: inherit; color: var(--text-primary);">${highlightPlaceholders(escapeHtml(currentOptimizedText))}</div>
             `;
 
             if (explanationText) {
                 expText.innerHTML = formatExplanation(explanationText);
-                expSection.style.display = "block";
             } else {
-                expSection.style.display = "none";
+                expText.innerHTML = "";
             }
+            document.getElementById("deltaToggle").setAttribute("aria-expanded", "false");
+            expSection.style.display = "none";
+            renderDeltaBar(explanationText, placeholderCount);
 
             refineSection.style.display = currentOptimizedText ? "block" : "none";
             testSection.style.display = "none";
             testColumns.style.display = "none";
             document.getElementById("refineInput").value = "";
+        }
+
+        // ---- Placeholder detection ----
+        const PLACEHOLDER_REGEX = /\{\{[^{}]{1,80}\}\}|\[[A-Z][A-Z0-9 _\-]{1,60}\]/g;
+
+        function countPlaceholders(text) {
+            if (!text) return 0;
+            const matches = text.match(PLACEHOLDER_REGEX);
+            return matches ? matches.length : 0;
+        }
+
+        function highlightPlaceholders(escapedText) {
+            return escapedText.replace(PLACEHOLDER_REGEX, (m) => `<span class="placeholder-chip">${m}</span>`);
+        }
+
+        // ---- Delta bar (enhancements above the fold) ----
+        function countBullets(explanationText) {
+            if (!explanationText) return 0;
+            const matches = explanationText.match(/^\s*[-*]\s+/gm);
+            return matches ? matches.length : 0;
+        }
+
+        function renderDeltaBar(explanationText, placeholderCount) {
+            const deltaBar = document.getElementById("deltaBar");
+            const deltaChips = document.getElementById("deltaChips");
+            const deltaToggle = document.getElementById("deltaToggle");
+            const bulletCount = countBullets(explanationText);
+
+            if (!explanationText && !placeholderCount) {
+                deltaBar.style.display = "none";
+                return;
+            }
+
+            const chips = [];
+            if (bulletCount) chips.push(`<span class="delta-chip">+${bulletCount} enhancement${bulletCount === 1 ? "" : "s"}</span>`);
+            if (placeholderCount) chips.push(`<span class="delta-chip warning">${placeholderCount} placeholder${placeholderCount === 1 ? "" : "s"} to fill</span>`);
+            deltaChips.innerHTML = chips.join("");
+            deltaToggle.style.display = explanationText ? "flex" : "none";
+            deltaBar.style.display = "block";
+        }
+
+        function toggleDelta() {
+            const toggle = document.getElementById("deltaToggle");
+            const section = document.getElementById("explanationSection");
+            const expanded = toggle.getAttribute("aria-expanded") === "true";
+            toggle.setAttribute("aria-expanded", String(!expanded));
+            section.style.display = expanded ? "none" : "block";
         }
 
         // ---- Diff view ----
@@ -1373,7 +1647,9 @@
             rawPromptEl.value = entry.raw || "";
             rawPromptEl.dispatchEvent(new Event("input"));
             document.getElementById("strength").value = entry.strength || "balanced";
-            document.getElementById("targetModel").value = entry.targetModel || "";
+            updateStrengthHint();
+            setChipGroupValue("targetChips", entry.targetModel || "");
+            setChipGroupValue("lengthChips", entry.length || "standard");
             renderOptimizedResult(entry.optimized || "", entry.explanation || "", entry.model, entry.raw || "");
         }
 

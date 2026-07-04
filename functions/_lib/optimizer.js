@@ -63,6 +63,14 @@ const STRENGTH_GUIDELINES = {
   balanced: "Strike an optimal balance between conciseness, instruction clarity, and contextual detail.",
 };
 
+// Controls the literal output length of the rewritten prompt, independent of
+// STRENGTH_GUIDELINES above (which governs structural balance, not word count).
+const LENGTH_GUIDELINES = {
+  concise: "Keep the rewritten prompt itself short and tight — roughly the same length as the raw input, favoring brevity over exhaustive structure even if that means omitting optional sections.",
+  standard: "Keep the rewritten prompt's overall length proportionate to the input — expand only what's needed for clarity, not for its own sake.",
+  full: "Expand the rewritten prompt with comprehensive context, detailed step-by-step instructions, edge cases, and constraints wherever they add value.",
+};
+
 const TECHNIQUE_GUIDELINES = {
   cot: "Instruct the model to reason step-by-step (chain-of-thought) before giving its final answer.",
   fewshot: "Include 1-3 well-chosen few-shot examples that demonstrate the desired input/output pattern.",
@@ -143,6 +151,10 @@ export function buildOptimizePrompt(body, rawPrompt) {
     systemPrompt += "\nAdditionally, incorporate these techniques:\n" +
       techniqueLines.map((l) => `- ${l}`).join("\n") + "\n";
   }
+
+  const length = String(body.length || "standard").trim().toLowerCase();
+  const lengthGuideline = LENGTH_GUIDELINES[length] || LENGTH_GUIDELINES.standard;
+  systemPrompt += `\nOutput length: ${lengthGuideline}\n`;
 
   const targetModel = String(body.target_model || "").trim().toLowerCase();
   const targetGuideline = TARGET_MODEL_GUIDELINES[targetModel];
