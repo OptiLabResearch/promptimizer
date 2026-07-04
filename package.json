@@ -1,0 +1,13 @@
+{
+  "name": "prompt-optimizer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A standalone prompt-optimization tool: paste a rough prompt, get back a structured, model-tailored rewrite. Runs on Cloudflare Pages + Functions.",
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}
