@@ -30,7 +30,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   try {
-    const { content, truncated } = await callCompletion(config, systemPrompt, userText);
+    const { content, truncated, model } = await callCompletion(config, systemPrompt, userText);
     if (truncated) {
       return json(
         { ok: false, error: "The model's response was cut off before it finished. Try a shorter prompt or a different model." },
@@ -38,7 +38,7 @@ export async function onRequestPost({ request, env }) {
       );
     }
     const { optimizedText, explanationText } = parseDelimitedResponse(content);
-    return json({ ok: true, optimized_prompt: optimizedText, explanation: explanationText, model: config.model });
+    return json({ ok: true, optimized_prompt: optimizedText, explanation: explanationText, model });
   } catch (e) {
     return json({ ok: false, error: e.message || "Optimization failed." }, 500);
   }

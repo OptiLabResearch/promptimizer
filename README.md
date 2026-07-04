@@ -41,15 +41,25 @@ If you want visitors to be able to use the tool without entering their own
 key, set these on the Pages project (Settings → Environment Variables /
 Secrets):
 
-- `HOSTED_PROVIDER` = `openrouter` or `nvidia`
-- `HOSTED_MODEL` = a model id available on that provider (e.g. a free
-  OpenRouter model like `deepseek/deepseek-chat-v3.1:free`)
-- `OPENROUTER_API_KEY` or `NVIDIA_API_KEY` (as a **secret**, matching
-  `HOSTED_PROVIDER`)
+- `HOSTED_PROVIDER` = `openrouter`, `nvidia`, or a comma-separated list of
+  both (e.g. `nvidia,openrouter`) to fail over from one provider to the next
+  if every model on the first provider errors out.
+- `HOSTED_MODEL` = a model id available on the *first* listed provider (e.g.
+  a free OpenRouter model like `deepseek/deepseek-chat-v3.1:free`, or an
+  NVIDIA NIM model like `nvidia/nemotron-3-super-120b-a12b`). Can be a
+  comma-separated list — if a model errors out (e.g. rate-limited), the next
+  one in the list is tried automatically.
+- `HOSTED_MODEL_NVIDIA` / `HOSTED_MODEL_OPENROUTER` — same as `HOSTED_MODEL`
+  but scoped to a specific provider. Use these instead of (or in addition to)
+  `HOSTED_MODEL` when `HOSTED_PROVIDER` lists more than one provider, so each
+  one gets its own model list.
+- `OPENROUTER_API_KEY` and/or `NVIDIA_API_KEY` (as **secrets**, matching
+  whichever provider(s) are listed in `HOSTED_PROVIDER`)
 
 When a visitor hasn't configured their own key in Settings, requests fall
-back to this shared key automatically. Anyone cloning this repo without
-setting these secrets will need to bring their own key.
+back to this shared configuration automatically, trying each model on each
+listed provider in order until one succeeds. Anyone cloning this repo
+without setting these secrets will need to bring their own key.
 
 ## Project layout
 

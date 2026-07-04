@@ -13,7 +13,7 @@ export const PROVIDER_PRESETS = {
     label: "NVIDIA NIM",
     mode: "chat",
     baseUrl: "https://integrate.api.nvidia.com/v1",
-    defaultModel: "meta/llama-3.1-8b-instruct",
+    defaultModel: "nvidia/nemotron-3-super-120b-a12b",
   },
   openai: {
     label: "OpenAI",
@@ -205,6 +205,16 @@ export function parseDelimitedResponse(rawResponse) {
 // Resolves which provider config to use: the caller's own key (BYO, from the
 // request body) takes priority; otherwise fall back to a shared key from
 // environment secrets (only present on the maintainer's hosted instance).
+//
+// The result is `{ attempts, source }`, where `attempts` is an ordered list
+// of `{ mode, baseUrl, apiKey, model }` candidates to try in sequence —
+// falling back to the next attempt on any upstream error (rate limit, 5xx,
+// etc). For BYO keys there's exactly one attempt. For the hosted instance,
+// `HOSTED_PROVIDER` may itself be a comma-separated list of providers (e.g.
+// "nvidia,openrouter"), each contributing its own models (from
+// `HOSTED_MODEL_<PROVIDER>`, or `HOSTED_MODEL` for the first provider, or
+// the provider's default) — so a request can fail over from one model to
+// the next *and* from one provider to the next.
 export function resolveProviderConfig(body, env) {
   const bodyApiKey = String(body.api_key || "").trim();
   const bodyProvider = String(body.provider || "").trim().toLowerCase();
@@ -218,32 +228,46 @@ export function resolveProviderConfig(body, env) {
     const model = bodyModel || (preset ? preset.defaultModel : "");
     if (!baseUrl) throw new ValidationError("A base URL is required for a custom provider.");
     if (!model) throw new ValidationError("A model is required.");
-    return { mode, baseUrl, apiKey: bodyApiKey, model, source: "byo" };
+    return { attempts: [{ mode, baseUrl, apiKey: bodyApiKey, model }], source: "byo" };
   }
 
-  // No client key supplied — try the server's shared hosted-instance key.
-  const sharedProvider = (env.HOSTED_PROVIDER || "").trim().toLowerCase();
-  const sharedKey = sharedProvider === "nvidia" ? env.NVIDIA_API_KEY : env.OPENROUTER_API_KEY;
-  if (sharedProvider && sharedKey) {
-    const preset = PROVIDER_PRESETS[sharedProvider];
-    const model = env.HOSTED_MODEL || (preset ? preset.defaultModel : "");
-    return { mode: preset.mode, baseUrl: preset.baseUrl, apiKey: sharedKey, model, source: "hosted" };
-  }
+  // No client key supplied — try the server's shared hosted-instance key(s).
+  const sharedProviders = String(env.HOSTED_PROVIDER || "")
+    .split(",")
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+
+  const attempts = [];
+  sharedProviders.forEach((provider, i) => {
+    const preset = PROVIDER_PRESETS[provider];
+    if (!preset) return;
+    const key = provider === "nvidia" ? env.NVIDIA_API_KEY : provider === "openrouter" ? env.OPENROUTER_API_KEY : undefined;
+    if (!key) return;
+    const rawModels = env[`HOSTED_MODEL_${provider.toUpperCase()}`] || (i === 0 ? env.HOSTED_MODEL : "");
+    const models = String(rawModels || "")
+      .split(",")
+      .map((m) => m.trim())
+      .filter(Boolean);
+    if (!models.length) models.push(preset.defaultModel);
+    for (const model of models) attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model });
+  });
+
+  if (attempts.length) return { attempts, source: "hosted" };
 
   throw new ValidationError(
     "No API key configured. Add your own key in Settings, or ask the site owner to configure a shared key."
   );
 }
 
-async function callChatCompletion(config, systemPrompt, userText, maxTokens) {
-  const resp = await fetch(`${config.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+async function callChatCompletionOnce(attempt, systemPrompt, userText, maxTokens) {
+  const resp = await fetch(`${attempt.baseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${attempt.apiKey}`,
     },
     body: JSON.stringify({
-      model: config.model,
+      model: attempt.model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userText },
@@ -263,16 +287,16 @@ async function callChatCompletion(config, systemPrompt, userText, maxTokens) {
   return { content, truncated };
 }
 
-async function callAnthropicCompletion(config, systemPrompt, userText, maxTokens) {
-  const resp = await fetch(`${config.baseUrl.replace(/\/$/, "")}/v1/messages`, {
+async function callAnthropicCompletionOnce(attempt, systemPrompt, userText, maxTokens) {
+  const resp = await fetch(`${attempt.baseUrl.replace(/\/$/, "")}/v1/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": config.apiKey,
+      "x-api-key": attempt.apiKey,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: config.model,
+      model: attempt.model,
       system: systemPrompt,
       messages: [{ role: "user", content: userText }],
       max_tokens: maxTokens,
@@ -288,56 +312,68 @@ async function callAnthropicCompletion(config, systemPrompt, userText, maxTokens
   return { content, truncated };
 }
 
+// Tries each attempt (model, possibly from a different provider) in order,
+// falling back to the next one if a request fails (e.g. rate-limited or
+// temporarily unavailable).
 export async function callCompletion(config, systemPrompt, userText, maxTokens = 4000) {
-  if (config.mode === "anthropic") return callAnthropicCompletion(config, systemPrompt, userText, maxTokens);
-  return callChatCompletion(config, systemPrompt, userText, maxTokens);
+  let lastError;
+  for (const attempt of config.attempts) {
+    try {
+      const result =
+        attempt.mode === "anthropic"
+          ? await callAnthropicCompletionOnce(attempt, systemPrompt, userText, maxTokens)
+          : await callChatCompletionOnce(attempt, systemPrompt, userText, maxTokens);
+      return { ...result, model: attempt.model };
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
 }
 
-// Streams text chunks from the upstream provider, calling onChunk(text) as
-// they arrive. Returns { truncated }.
-export async function streamCompletion(config, systemPrompt, userText, maxTokens, onChunk) {
-  if (config.mode === "anthropic") {
-    const resp = await fetch(`${config.baseUrl.replace(/\/$/, "")}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": config.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: config.model,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userText }],
-        max_tokens: maxTokens,
-        stream: true,
-      }),
-    });
-    if (!resp.ok || !resp.body) {
-      const text = await resp.text().catch(() => "");
-      throw new Error(`Upstream provider error (${resp.status}): ${text.slice(0, 300)}`);
-    }
-    let truncated = false;
-    for await (const event of iterSseEvents(resp.body)) {
-      let data;
-      try {
-        data = JSON.parse(event.data);
-      } catch (e) {
-        continue;
-      }
-      if (data.type === "content_block_delta" && data.delta?.text) onChunk(data.delta.text);
-      if (data.type === "message_delta" && data.delta?.stop_reason === "max_tokens") truncated = true;
-    }
-    return { truncated };
-  }
-
-  const resp = await fetch(`${config.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+async function streamAnthropicOnce(attempt, systemPrompt, userText, maxTokens, onChunk) {
+  const resp = await fetch(`${attempt.baseUrl.replace(/\/$/, "")}/v1/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
+      "x-api-key": attempt.apiKey,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: config.model,
+      model: attempt.model,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userText }],
+      max_tokens: maxTokens,
+      stream: true,
+    }),
+  });
+  if (!resp.ok || !resp.body) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Upstream provider error (${resp.status}): ${text.slice(0, 300)}`);
+  }
+  let truncated = false;
+  for await (const event of iterSseEvents(resp.body)) {
+    let data;
+    try {
+      data = JSON.parse(event.data);
+    } catch (e) {
+      continue;
+    }
+    if (data.type === "content_block_delta" && data.delta?.text) onChunk(data.delta.text);
+    if (data.type === "message_delta" && data.delta?.stop_reason === "max_tokens") truncated = true;
+  }
+  return { truncated };
+}
+
+async function streamChatOnce(attempt, systemPrompt, userText, maxTokens, onChunk) {
+  const resp = await fetch(`${attempt.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${attempt.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: attempt.model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userText },
@@ -366,6 +402,26 @@ export async function streamCompletion(config, systemPrompt, userText, maxTokens
     if (String(choice?.finish_reason || "") === "length") truncated = true;
   }
   return { truncated };
+}
+
+// Streams text chunks from the upstream provider, calling onChunk(text) as
+// they arrive. Tries each attempt (model, possibly from a different
+// provider) in order, falling back to the next one if a request fails
+// before any chunk is emitted. Returns { truncated, model }.
+export async function streamCompletion(config, systemPrompt, userText, maxTokens, onChunk) {
+  let lastError;
+  for (const attempt of config.attempts) {
+    try {
+      const result =
+        attempt.mode === "anthropic"
+          ? await streamAnthropicOnce(attempt, systemPrompt, userText, maxTokens, onChunk)
+          : await streamChatOnce(attempt, systemPrompt, userText, maxTokens, onChunk);
+      return { ...result, model: attempt.model };
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
 }
 
 // Minimal SSE parser for upstream provider streams: yields {event, data} per
