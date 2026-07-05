@@ -697,6 +697,38 @@
             color: var(--danger-red);
         }
 
+        .tab-btn {
+            background: none;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem 0;
+            outline: none;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .tab-btn.active {
+            color: var(--accent-purple);
+            border-bottom-color: var(--accent-purple);
+            font-weight: 700;
+        }
+        .chip-tag {
+            background: rgba(15, 23, 42, 0.05);
+            padding: 0.15rem 0.45rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+        .chip-tag.add-tag:hover {
+            background: rgba(139, 92, 246, 0.15) !important;
+        }
+
         .technique-row {
             display: flex;
             flex-wrap: wrap;
@@ -1216,6 +1248,11 @@
             <div id="charCount" style="text-align: right; font-size: 0.75rem; color: var(--text-secondary); margin-top: -0.5rem;">0 / 30,000</div>
             <div class="field-error" id="promptError">Please enter a prompt to optimize.</div>
 
+            <div id="presetCatalog" style="margin: 0.5rem 0 1rem 0;">
+                <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Try a sample prompt:</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;" id="presetChips"></div>
+            </div>
+
             <div class="technique-row">
                 <label class="technique-option" title="Only helps on small non-reasoning models; on reasoning models we recommend a thinking-budget note instead."><input type="checkbox" class="technique-checkbox" value="cot"> Chain-of-thought</label>
                 <label class="technique-option" title="Include 2-3 curated contrastive examples (including a near-miss negative) consistent with all stated rules."><input type="checkbox" class="technique-checkbox" value="fewshot"> Few-shot examples</label>
@@ -1272,13 +1309,21 @@
             <div class="field-hint" id="strengthHint">Strikes an even balance between conciseness, clarity, and contextual detail.</div>
 
             <div class="history-section">
-                <div class="history-header">
-                    <button class="history-toggle" id="historyToggle" onclick="toggleHistory()">
-                        <span class="chevron">▶</span> <span id="historyToggleLabel">History (0)</span>
-                    </button>
+                <!-- Dual-Tab Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--card-border); margin-bottom: 1rem; padding-bottom: 0.25rem;">
+                    <div style="display: flex; gap: 1rem;">
+                        <button type="button" class="tab-btn active" id="tabLibraryBtn" onclick="switchLibraryTab('library')">Saved Prompts (Library)</button>
+                        <button type="button" class="tab-btn" id="tabHistoryBtn" onclick="switchLibraryTab('history')">Recent Runs (History)</button>
+                    </div>
                     <button class="clear-history-btn" id="clearHistoryBtn" onclick="clearHistory()" style="display: none;">Clear history</button>
                 </div>
-                <div class="history-list" id="historyList"></div>
+                
+                <!-- Library Search (Only visible when Library tab is active) -->
+                <div id="librarySearchRow" style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center;">
+                    <input type="text" id="librarySearchInput" oninput="renderLibrary()" placeholder="Search library by name, tag, or content..." style="flex: 1; font-size: 0.85rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.85); outline: none;">
+                </div>
+                
+                <div class="history-list open" id="historyList"></div>
             </div>
         </div>
 
@@ -1335,23 +1380,53 @@
                 </div>
             </div>
 
-            <div class="test-section" id="testSection" style="display: none;">
-                <div class="test-header">
-                    <h2><span class="icon">⚖️</span> Before / After Test Run</h2>
-                    <button class="copy-btn" id="runTestBtn" onclick="runTestBoth()">
-                        <span class="loader" id="testLoader"></span>
-                        <span id="testBtnText">Run Test</span>
+        </div>
+
+        <!-- State 3: Test Bench Panel -->
+        <div class="panel" id="testBenchPanel" style="display: none;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <button type="button" class="copy-btn" onclick="goToResultState()" style="border: none; background: none; font-size: 1.1rem; color: var(--accent-purple); cursor: pointer; padding: 0.25rem 0.5rem; min-height: auto;" title="Back to Result">← Back</button>
+                    <h2 style="margin: 0;"><span class="icon">⚖️</span> Test Bench</h2>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                    Engine: <span id="testBenchModelBadge" style="font-weight: 600; color: var(--text-primary);">Default</span>
+                </div>
+            </div>
+            
+            <div style="background: rgba(139, 92, 246, 0.03); border: 1px solid var(--card-border); border-radius: 16px; padding: 1.25rem; margin-bottom: 1.5rem;">
+                <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--text-primary);">Test Input / Context Data</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                    Provide mock text, variables, or data context that will be appended/merged to both original and optimized prompts.
+                </div>
+                <textarea id="testBenchInput" style="width: 100%; min-height: 120px; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--card-border); font-family: var(--font-mono); font-size: 0.85rem; margin-bottom: 1rem; resize: vertical; outline: none; background: white;" placeholder="Enter test query or input data here (optional)..."></textarea>
+                
+                <div style="display: flex; justify-content: flex-end;">
+                    <button class="btn" id="runTestBenchBtn" onclick="runTestBench()">
+                        <span class="loader" id="testBenchLoader"></span>
+                        <span id="testBenchBtnText">Run Test Comparison</span>
                     </button>
                 </div>
-                <div class="test-columns" id="testColumns" style="display: none;">
-                    <div class="test-column">
-                        <div class="test-column-label">Original Prompt Output</div>
-                        <div class="test-output" id="testOriginalOutput"></div>
+            </div>
+            
+            <!-- Verdict Strip -->
+            <div id="testBenchVerdictStrip" style="display: none; margin-bottom: 1.5rem;"></div>
+            
+            <!-- Comparison Columns -->
+            <div class="test-columns" id="testBenchColumns" style="display: none; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+                <div class="test-column" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 0.25rem;">
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Original Prompt Response</span>
+                        <button type="button" class="copy-btn" onclick="saveWinner('original')" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; min-height: 32px;"><span class="btn-icon">🏆</span> Save Winner</button>
                     </div>
-                    <div class="test-column">
-                        <div class="test-column-label">Optimized Prompt Output</div>
-                        <div class="test-output" id="testOptimizedOutput"></div>
+                    <div class="test-output" id="testBenchOriginalOutput" style="background: white; border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; min-height: 250px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.5; color: var(--text-primary);"></div>
+                </div>
+                <div class="test-column" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 0.25rem;">
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Optimized Prompt Response</span>
+                        <button type="button" class="copy-btn primary-action" onclick="saveWinner('optimized')" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; min-height: 32px;"><span class="btn-icon">🏆</span> Save Winner</button>
                     </div>
+                    <div class="test-output" id="testBenchOptimizedOutput" style="background: white; border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; min-height: 250px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.5; color: var(--text-primary);"></div>
                 </div>
             </div>
         </div>
@@ -1393,6 +1468,64 @@
             <div class="modal-actions">
                 <button class="btn" onclick="saveSettings()">Save</button>
                 <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="savePromptModal">
+        <div class="modal">
+            <h3>Save to Library</h3>
+            
+            <div class="field-group" id="savePromptTypeGroup" style="display: none;">
+                <label>Save Option</label>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; cursor: pointer; color: var(--text-primary);">
+                        <input type="radio" name="saveOption" id="saveOptionVersion" value="version" checked onclick="toggleSaveOptionTitle()">
+                        <span>Add as new version to active prompt</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; cursor: pointer; color: var(--text-primary);">
+                        <input type="radio" name="saveOption" id="saveOptionNew" value="new" onclick="toggleSaveOptionTitle()">
+                        <span>Save as a new saved prompt</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label for="savePromptTitle">Title</label>
+                <input type="text" id="savePromptTitle" placeholder="e.g. Weather DB Loader">
+            </div>
+
+            <div class="field-group">
+                <label for="savePromptTags">Tags (comma-separated)</label>
+                <input type="text" id="savePromptTags" placeholder="e.g. coding, database">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn" onclick="confirmSavePrompt()">Save</button>
+                <button class="btn btn-secondary" onclick="closeSavePromptModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="exportModal">
+        <div class="modal" style="max-width: 400px;">
+            <h3>Export Prompt</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">Select your desired format to download the optimized prompt.</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <button class="btn btn-secondary" onclick="downloadPrompt('markdown')" style="justify-content: flex-start; gap: 0.75rem; width: 100%; min-height: 44px; padding: 0 1.25rem;">
+                    <span>📝</span> <span>Markdown (.md) with Metadata</span>
+                </button>
+                <button class="btn btn-secondary" onclick="downloadPrompt('text')" style="justify-content: flex-start; gap: 0.75rem; width: 100%; min-height: 44px; padding: 0 1.25rem;">
+                    <span>📄</span> <span>Plain Text (.txt) only</span>
+                </button>
+                <button class="btn btn-secondary" onclick="downloadPrompt('json')" style="justify-content: flex-start; gap: 0.75rem; width: 100%; min-height: 44px; padding: 0 1.25rem;">
+                    <span>⚙️</span> <span>JSON with variables schema</span>
+                </button>
+            </div>
+
+            <div class="modal-actions" style="justify-content: flex-end; margin-top: 1.5rem;">
+                <button class="btn btn-secondary" onclick="closeExportModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1520,6 +1653,94 @@
             if (match) selectChip(groupId, match);
         }
 
+        const PRESETS = [
+            {
+                title: "💻 Coding Script",
+                prompt: `Write a small python script that pulls weather info from open weather api and updates a postgres db.
+The database schema has a table called weather_logs with columns logged_at, store_id, temperature, and description.
+Keep standard error boundary checks.
+We also need a dynamic variable parameter {{database_url}} to pass in at runtime.`,
+                targetModel: "gpt",
+                length: "standard"
+            },
+            {
+                title: "📊 Data Extraction",
+                prompt: `Extract structured receipt data out of raw text.
+Ensure you scan and map:
+- store_name
+- purchase_date
+- itemized_purchases (as array)
+- taxes_calculated
+Return strictly a valid raw JSON block.
+Include a parameter for user {{max_items_limit}} to limit parsing array bounds.`,
+                targetModel: "claude",
+                length: "concise"
+            },
+            {
+                title: "📝 Article Summarizer",
+                prompt: `You will be given a long article. Condense it into a bulleted executive summary of the key findings.
+Ensure the summary is in a {{tone}} tone (e.g. professional, casual, academic).
+The summary should be no longer than {{max_words}} words.
+Article content:
+{{article_content}}`,
+                targetModel: "gemini",
+                length: "standard"
+            },
+            {
+                title: "🏷️ Support Ticket Classifier",
+                prompt: `Classify incoming customer support tickets into one of the following categories: Billing, Technical Support, Account Access, or Feedback.
+Use few-shot examples to illustrate the classification rules.
+Provide a confidence score from 0 to 1.
+Ticket text to classify:
+{{ticket_text}}`,
+                targetModel: "generic",
+                length: "standard"
+            },
+            {
+                title: "✍️ Social Post Writer",
+                prompt: `Write a high-converting social media post for our product launch.
+Target Audience: {{audience}}
+Key benefits / keywords to include: {{keywords}}
+Tone of voice: Energetic, bold, and developer-focused.
+Limit to 280 characters.`,
+                targetModel: "generic",
+                length: "concise"
+            },
+            {
+                title: "🔍 SQL Query Generator",
+                prompt: `Given a PostgreSQL table schema, convert natural language questions into valid SQL queries.
+Schema details:
+Table: users (id SERIAL, name VARCHAR, email VARCHAR, created_at TIMESTAMP)
+Table: orders (id SERIAL, user_id INT, total NUMERIC, status VARCHAR, ordered_at TIMESTAMP)
+Generate a query for: {{user_query}}`,
+                targetModel: "local",
+                length: "standard"
+            }
+        ];
+
+        function initPresets() {
+            const container = document.getElementById("presetChips");
+            if (!container) return;
+            container.innerHTML = PRESETS.map((p, idx) => {
+                return `<button type="button" class="chip" onclick="loadPreset(${idx})">${escapeHtml(p.title)}</button>`;
+            }).join("");
+        }
+
+        function loadPreset(idx) {
+            const p = PRESETS[idx];
+            if (!p) return;
+            const rawPromptEl = document.getElementById("rawPrompt");
+            rawPromptEl.value = p.prompt;
+            rawPromptEl.dispatchEvent(new Event("input"));
+            
+            // Set length setting
+            setChipGroupValue("lengthChips", p.length || "standard");
+            // Set target setting
+            setChipGroupValue("targetChips", p.targetModel || "");
+            
+            showToast(`Loaded "${p.title}" preset.`);
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             refreshModelPill();
             updateStrengthHint();
@@ -1539,7 +1760,9 @@
             rawPromptEl.addEventListener("input", updateCharCount);
             updateCharCount();
 
-            renderHistory();
+            currentLibraryId = null;
+            switchLibraryTab('library');
+            initPresets();
         });
 
         function buildOptimizeRequestBody(rawPrompt, strength, targetModel) {
@@ -1730,6 +1953,8 @@
         let currentPlaceholders = [];
         let placeholderValues = {};
         let warningDismissed = false;
+        let currentLibraryId = null;
+        let currentLibraryTab = "library";
 
         function restoreInputState() {
             document.getElementById("inputPanel").style.display = "flex";
@@ -1743,8 +1968,7 @@
             const outputBox = document.getElementById("outputBox");
             const expSection = document.getElementById("explanationSection");
             const refineSection = document.getElementById("refineSection");
-            const testSection = document.getElementById("testSection");
-            const testColumns = document.getElementById("testColumns");
+            const testBenchPanel = document.getElementById("testBenchPanel");
 
             currentOptimizedText = optimizedText || "";
             currentRawPrompt = rawPromptForDiff !== undefined ? rawPromptForDiff : document.getElementById("rawPrompt").value;
@@ -1770,6 +1994,7 @@
                     ${warningHtml}
                     <button class="copy-btn copy-action" onclick="copyToClipboard()"><span class="btn-icon">📋</span> Copy</button>
                     <button class="copy-btn save-action" onclick="saveToLibrary()"><span class="btn-icon">💾</span> Save</button>
+                    <button class="copy-btn export-action" onclick="openExportModal()"><span class="btn-icon">📥</span> Export</button>
                     <button class="copy-btn diff-action" onclick="toggleDiffView()"><span class="btn-icon">🔀</span> Diff</button>
                     <button class="copy-btn primary-action test-action" onclick="showTestSection()"><span class="btn-icon">⚖️</span> Test Both</button>
                 </div>
@@ -1790,8 +2015,7 @@
             updateTokenEstimates();
 
             refineSection.style.display = currentOptimizedText ? "block" : "none";
-            testSection.style.display = "none";
-            testColumns.style.display = "none";
+            if (testBenchPanel) testBenchPanel.style.display = "none";
             document.getElementById("refineInput").value = "";
         }
 
@@ -2350,29 +2574,75 @@
 
         // ---- Before/after test run ----
         function showTestSection() {
-            const testSection = document.getElementById("testSection");
-            testSection.style.display = "block";
-            testSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            // Transition to Test Bench State (State 3)
+            document.getElementById("resultPanel").style.display = "none";
+            document.getElementById("testBenchPanel").style.display = "flex";
+            
+            // Set model badge
+            const settings = loadSettings();
+            const badge = document.getElementById("testBenchModelBadge");
+            if (badge) {
+                if (settings.provider) {
+                    const providerName = settings.provider.charAt(0).toUpperCase() + settings.provider.slice(1);
+                    badge.innerText = `${providerName} (${settings.model || "Default"})`;
+                } else {
+                    badge.innerText = "Shared Hosted Engine";
+                }
+            }
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: "smooth" });
         }
 
-        async function runTestBoth() {
+        function goToResultState() {
+            // Transition back to Result State (State 2)
+            document.getElementById("testBenchPanel").style.display = "none";
+            document.getElementById("resultPanel").style.display = "flex";
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        function compileOriginalPrompt() {
+            let compiled = currentRawPrompt;
+            for (const [token, value] of Object.entries(placeholderValues)) {
+                if (value) {
+                    const escapedToken = token.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                    compiled = compiled.replace(new RegExp(escapedToken, 'g'), value);
+                }
+            }
+            return compiled;
+        }
+
+        async function runTestBench() {
             if (!currentRawPrompt || !currentOptimizedText) return;
-            const btn = document.getElementById("runTestBtn");
-            const btnText = document.getElementById("testBtnText");
-            const loader = document.getElementById("testLoader");
-            const testColumns = document.getElementById("testColumns");
-            const originalOutEl = document.getElementById("testOriginalOutput");
-            const optimizedOutEl = document.getElementById("testOptimizedOutput");
+            const btn = document.getElementById("runTestBenchBtn");
+            const btnText = document.getElementById("testBenchBtnText");
+            const loader = document.getElementById("testBenchLoader");
+            const testColumns = document.getElementById("testBenchColumns");
+            const originalOutEl = document.getElementById("testBenchOriginalOutput");
+            const optimizedOutEl = document.getElementById("testBenchOptimizedOutput");
+            const verdictStrip = document.getElementById("testBenchVerdictStrip");
+            const testInputVal = document.getElementById("testBenchInput").value.trim();
 
             btn.disabled = true;
-            btnText.innerText = "Running...";
+            btnText.innerText = "Running Test...";
             loader.style.display = "block";
             testColumns.style.display = "grid";
-            originalOutEl.textContent = "Running...";
-            optimizedOutEl.textContent = "Running...";
+            originalOutEl.textContent = "Generating response from original prompt...";
+            optimizedOutEl.textContent = "Generating response from optimized prompt...";
+            verdictStrip.style.display = "none";
 
             try {
-                const body = { original: currentRawPrompt, optimized: currentOptimizedText, ...providerFields() };
+                // Compile the templates with the sandbox values
+                let finalOriginal = compileOriginalPrompt();
+                let finalOptimized = compilePrompt();
+
+                // Append test input scenario context if provided
+                if (testInputVal) {
+                    finalOriginal = `${finalOriginal}\n\n[TEST INPUT DATA]:\n${testInputVal}`;
+                    finalOptimized = `${finalOptimized}\n\n[TEST INPUT DATA]:\n${testInputVal}`;
+                }
+
+                const body = { original: finalOriginal, optimized: finalOptimized, ...providerFields() };
                 const response = await fetch("/api/optimize-prompt/test", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -2382,20 +2652,129 @@
                 if (!response.ok || !data.ok) {
                     throw new Error(data.error || "Test run failed.");
                 }
-                originalOutEl.textContent = data.original_output || "(empty response)";
-                optimizedOutEl.textContent = data.optimized_output || "(empty response)";
+                const originalText = data.original_output || "";
+                const optimizedText = data.optimized_output || "";
+                
+                originalOutEl.textContent = originalText || "(empty response)";
+                optimizedOutEl.textContent = optimizedText || "(empty response)";
+                
                 if (data.original_truncated || data.optimized_truncated) {
                     showToast("One or both outputs were cut off by the token limit.", true);
                 }
+
+                // Render comparative analysis
+                renderVerdictStrip(originalText, optimizedText);
             } catch (err) {
                 originalOutEl.textContent = "";
                 optimizedOutEl.textContent = "";
                 showToast(err.message || "Test run failed.", true);
             } finally {
                 btn.disabled = false;
-                btnText.innerText = "Run Test";
+                btnText.innerText = "Run Test Comparison";
                 loader.style.display = "none";
             }
+        }
+
+        function renderVerdictStrip(orig, opt) {
+            const verdictStrip = document.getElementById("testBenchVerdictStrip");
+            if (!verdictStrip) return;
+
+            // Word and Char counts
+            const origWords = orig.split(/\s+/).filter(Boolean).length;
+            const optWords = opt.split(/\s+/).filter(Boolean).length;
+            const origChars = orig.length;
+            const optChars = opt.length;
+
+            const wordDelta = optWords - origWords;
+            const wordPct = origWords ? Math.round((wordDelta / origWords) * 100) : 0;
+            const wordMsg = wordDelta === 0 ? "Same length" : (wordDelta > 0 ? `${wordPct}% longer (+${wordDelta} words)` : `${Math.abs(wordPct)}% shorter (${wordDelta} words)`);
+
+            // Structure comparison (paragraphs, bullet points, xml tags)
+            const origParas = orig.split(/\n\s*\n/).filter(Boolean).length;
+            const optParas = opt.split(/\n\s*\n/).filter(Boolean).length;
+            
+            const origBullets = (orig.match(/^\s*[-*•]\s+/gm) || []).length;
+            const optBullets = (opt.match(/^\s*[-*•]\s+/gm) || []).length;
+
+            const origTags = (orig.match(/<[^>]+>/g) || []).length;
+            const optTags = (opt.match(/<[^>]+>/g) || []).length;
+
+            // Target guidelines adherence check
+            const targetModel = document.getElementById("targetModel").value || "generic";
+            let adherenceMsg = "";
+            if (targetModel === "claude") {
+                if (origTags === 0 && optTags > 0) {
+                    adherenceMsg = "Optimized response utilized structured XML tags (e.g. wrapper tags) conforming to Claude guidelines.";
+                } else if (optTags > 0) {
+                    adherenceMsg = "Response format conforms to Claude tag nesting guidelines.";
+                } else {
+                    adherenceMsg = "Claude: No XML tags detected in response. Ensure tags are requested if structured output is needed.";
+                }
+            } else if (targetModel === "gpt") {
+                const hasMdHeader = /^\s*#+\s+/gm.test(opt);
+                if (hasMdHeader) {
+                    adherenceMsg = "Optimized response used markdown header separation conforming to GPT guidelines.";
+                } else {
+                    adherenceMsg = "GPT: Response didn't use markdown headers for structure.";
+                }
+            } else {
+                adherenceMsg = "Optimized prompt response structure is clean and formatting guidelines were adhered to.";
+            }
+
+            verdictStrip.innerHTML = `
+                <div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.15); border-left: 4px solid var(--success-green); border-radius: 12px; padding: 1.25rem;">
+                    <h4 style="margin: 0 0 0.75rem 0; color: #065f46; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; font-family: 'Outfit', sans-serif;">
+                        <span>📊</span> Response Comparison Verdict
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; font-size: 0.85rem;">
+                        <div style="background: white; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--card-border);">
+                            <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">Length & Verbosity</div>
+                            <div>Original: ${origWords} words (${origChars} chars)</div>
+                            <div style="font-weight: 600; color: ${wordDelta <= 0 ? 'var(--success-green)' : 'var(--text-secondary)'}; margin-top: 0.15rem;">${wordMsg}</div>
+                        </div>
+                        <div style="background: white; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--card-border);">
+                            <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">Structural Elements</div>
+                            <div>Original: ${origParas} paras, ${origBullets} bullets ${origTags ? `, ${origTags} tags` : ""}</div>
+                            <div style="font-weight: 600; color: var(--accent-purple); margin-top: 0.15rem;">Optimized: ${optParas} paras, ${optBullets} bullets ${optTags ? `, ${optTags} tags` : ""}</div>
+                        </div>
+                        <div style="background: white; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--card-border);">
+                            <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">Instruction Adherence Heuristic</div>
+                            <div style="color: var(--text-secondary);">${adherenceMsg}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            verdictStrip.style.display = "block";
+        }
+
+        function saveWinner(type) {
+            let text = "";
+            let suggestedTitle = "";
+            if (type === "original") {
+                text = compileOriginalPrompt();
+                suggestedTitle = "Winner Prompt (Original)";
+            } else {
+                text = compilePrompt();
+                suggestedTitle = "Winner Prompt (Optimized)";
+            }
+
+            if (!text.trim()) {
+                showToast("Winner prompt is empty.", true);
+                return;
+            }
+
+            // Save to library flow
+            const titleInput = document.getElementById("savePromptTitle");
+            const tagsInput = document.getElementById("savePromptTags");
+            const typeGroup = document.getElementById("savePromptTypeGroup");
+
+            titleInput.value = suggestedTitle;
+            titleInput.disabled = false;
+            tagsInput.value = "winner, tested";
+            typeGroup.style.display = "none";
+
+            // Open the save prompt modal so the user can finalize name/tags
+            document.getElementById("savePromptModal").classList.add("open");
         }
 
         const HISTORY_KEY = "promptOptimizerHistory";
@@ -2416,21 +2795,28 @@
             history.unshift(entry);
             if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
             localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-            renderHistory();
+            if (currentLibraryTab === "history") {
+                renderHistory();
+            }
         }
 
         function clearHistory() {
             localStorage.removeItem(HISTORY_KEY);
-            renderHistory();
+            if (currentLibraryTab === "history") {
+                renderHistory();
+            }
         }
 
         function renderHistory() {
             const history = loadHistory();
             const list = document.getElementById("historyList");
-            const label = document.getElementById("historyToggleLabel");
             const clearBtn = document.getElementById("clearHistoryBtn");
-            label.innerText = `History (${history.length})`;
-            clearBtn.style.display = history.length ? "inline-block" : "none";
+            
+            if (currentLibraryTab === "history") {
+                clearBtn.style.display = history.length ? "inline-block" : "none";
+            } else {
+                clearBtn.style.display = "none";
+            }
 
             if (!history.length) {
                 list.innerHTML = `<div class="history-empty">No optimizations yet.</div>`;
@@ -2451,6 +2837,9 @@
             const history = loadHistory();
             const entry = history[idx];
             if (!entry) return;
+            
+            currentLibraryId = null; // History run doesn't associate with a library item until saved
+            
             const rawPromptEl = document.getElementById("rawPrompt");
             rawPromptEl.value = entry.raw || "";
             rawPromptEl.dispatchEvent(new Event("input"));
@@ -2476,23 +2865,441 @@
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
 
-        function toggleHistory() {
-            document.getElementById("historyToggle").classList.toggle("open");
-            document.getElementById("historyList").classList.toggle("open");
+        let selectedVersions = {}; // Map of itemId -> versionIndex
+
+        function loadLibrary() {
+            try {
+                const raw = localStorage.getItem(LIBRARY_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveLibrary(library) {
+            try {
+                localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+            } catch (e) {
+                showToast("Failed to save to library.", true);
+            }
+        }
+
+        function switchLibraryTab(tab) {
+            currentLibraryTab = tab;
+            document.querySelectorAll(".tab-btn").forEach(btn => {
+                btn.classList.remove("active");
+            });
+            
+            const activeBtn = document.getElementById(tab === "library" ? "tabLibraryBtn" : "tabHistoryBtn");
+            if (activeBtn) activeBtn.classList.add("active");
+            
+            // Show/hide search row
+            const searchRow = document.getElementById("librarySearchRow");
+            if (searchRow) searchRow.style.display = tab === "library" ? "flex" : "none";
+            
+            if (tab === "library") {
+                renderLibrary();
+            } else {
+                renderHistory();
+            }
+        }
+
+        function renderLibrary() {
+            const library = loadLibrary();
+            const list = document.getElementById("historyList");
+            const clearBtn = document.getElementById("clearHistoryBtn");
+            if (clearBtn) clearBtn.style.display = "none";
+            
+            const searchInput = document.getElementById("librarySearchInput");
+            const query = (searchInput ? searchInput.value : "").trim().toLowerCase();
+            
+            const filtered = library.filter(item => {
+                if (!query) return true;
+                if (item.name.toLowerCase().includes(query)) return true;
+                if (item.tags && item.tags.some(t => t.toLowerCase().includes(query))) return true;
+                return item.versions.some(v => 
+                    (v.raw || "").toLowerCase().includes(query) || 
+                    (v.optimized || "").toLowerCase().includes(query)
+                );
+            });
+            
+            if (!filtered.length) {
+                list.innerHTML = `<div class="history-empty">${query ? "No matching saved prompts." : "Your library is empty. Save optimizations to keep them here."}</div>`;
+                return;
+            }
+            
+            list.innerHTML = filtered.map(item => {
+                const latestIdx = item.versions.length - 1;
+                const activeIdx = selectedVersions[item.id] !== undefined ? selectedVersions[item.id] : latestIdx;
+                const version = item.versions[activeIdx] || item.versions[latestIdx];
+                const date = new Date(version.timestamp).toLocaleString();
+                const snippet = escapeHtml((version.raw || "").slice(0, 80));
+                
+                // Tags HTML
+                const tagsHtml = (item.tags || []).map(t => `
+                    <span class="chip-tag">
+                        ${escapeHtml(t)}
+                        <span onclick="removeTagFromLibraryEntry('${item.id}', '${escapeHtml(t)}')" style="cursor: pointer; color: var(--text-secondary); font-weight: bold; font-size: 0.7rem; line-height: 1;">×</span>
+                    </span>
+                `).join("");
+                
+                // Version selector
+                let versionSelectHtml = "";
+                if (item.versions.length > 1) {
+                    const options = item.versions.map((v, i) => `
+                        <option value="${i}" ${i === activeIdx ? "selected" : ""}>v${i + 1}</option>
+                    `).join("");
+                    versionSelectHtml = `
+                        <select onchange="changeLibraryItemVersion('${item.id}', this.value)" style="font-size: 0.75rem; padding: 0.1rem 0.3rem; border-radius: 4px; border: 1px solid var(--card-border); background: white; margin-left: 0.5rem; outline: none; cursor: pointer;">
+                            ${options}
+                        </select>
+                    `;
+                } else {
+                    versionSelectHtml = `<span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">v1</span>`;
+                }
+                
+                return `
+                    <div class="history-item" style="cursor: default; display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem; position: relative;">
+                        <div class="history-meta" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;">
+                            <div style="display: flex; align-items: center; flex-wrap: wrap;">
+                                <span id="lib-name-${item.id}" onclick="startRenameLibraryEntry('${item.id}')" style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); cursor: pointer; border-bottom: 1px dashed var(--accent-purple); margin-right: 0.5rem;" title="Click to rename">${escapeHtml(item.name)}</span>
+                                ${versionSelectHtml}
+                            </div>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">${date}</span>
+                        </div>
+                        
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;" id="lib-tags-${item.id}">
+                            ${tagsHtml}
+                            <span class="chip-tag add-tag" onclick="startAddTag('${item.id}')" style="cursor: pointer; background: rgba(139, 92, 246, 0.1); color: var(--accent-purple); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">+ tag</span>
+                        </div>
+                        
+                        <div class="history-snippet" style="font-family: var(--font-mono); font-size: 0.8rem; background: rgba(15,23,42,0.02); padding: 0.5rem; border-radius: 6px; border: 1px dashed var(--card-border); margin: 0.25rem 0;">${snippet}</div>
+                        
+                        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.25rem;">
+                            <button type="button" class="copy-btn" onclick="loadLibraryEntry('${item.id}', ${activeIdx})" style="padding: 0.25rem 0.75rem; font-size: 0.8rem; min-height: 32px;"><span class="btn-icon">✏️</span> Load</button>
+                            <button type="button" class="copy-btn" onclick="deleteLibraryEntry('${item.id}')" style="padding: 0.25rem 0.75rem; font-size: 0.8rem; min-height: 32px; color: var(--danger-red); border-color: rgba(220,38,38,0.15);"><span class="btn-icon">🗑️</span> Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function changeLibraryItemVersion(id, val) {
+            selectedVersions[id] = parseInt(val);
+            renderLibrary();
+        }
+
+        function startRenameLibraryEntry(id) {
+            const el = document.getElementById(`lib-name-${id}`);
+            if (!el) return;
+            const currentName = el.innerText;
+            
+            const input = document.createElement("input");
+            input.type = "text";
+            input.id = `lib-name-input-${id}`;
+            input.value = currentName;
+            input.style.fontSize = "0.95rem";
+            input.style.fontWeight = "700";
+            input.style.padding = "0.1rem 0.3rem";
+            input.style.borderRadius = "4px";
+            input.style.border = "1px solid var(--accent-purple)";
+            input.style.outline = "none";
+            input.style.width = "200px";
+            
+            input.onblur = function() {
+                finishRenameLibraryEntry(id, this.value);
+            };
+            input.onkeydown = function(e) {
+                if (e.key === "Enter") this.blur();
+            };
+            
+            el.replaceWith(input);
+            input.focus();
+        }
+
+        function finishRenameLibraryEntry(id, newName) {
+            newName = newName.trim();
+            if (newName) {
+                const library = loadLibrary();
+                const item = library.find(x => x.id === id);
+                if (item) {
+                    item.name = newName;
+                    saveLibrary(library);
+                }
+            }
+            renderLibrary();
+        }
+
+        function startAddTag(id) {
+            const parent = document.getElementById(`lib-tags-${id}`);
+            const btn = parent.querySelector(".add-tag");
+            
+            const input = document.createElement("input");
+            input.type = "text";
+            input.placeholder = "tag name...";
+            input.style.fontSize = "0.75rem";
+            input.style.padding = "0.1rem 0.3rem";
+            input.style.borderRadius = "4px";
+            input.style.border = "1px solid var(--accent-purple)";
+            input.style.width = "70px";
+            input.style.outline = "none";
+            
+            input.onblur = function() {
+                const val = this.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+                if (val) {
+                    const library = loadLibrary();
+                    const item = library.find(x => x.id === id);
+                    if (item) {
+                        if (!item.tags) item.tags = [];
+                        if (!item.tags.includes(val)) {
+                            item.tags.push(val);
+                            saveLibrary(library);
+                        }
+                    }
+                }
+                renderLibrary();
+            };
+            input.onkeydown = function(e) {
+                if (e.key === "Enter") this.blur();
+            };
+            
+            btn.replaceWith(input);
+            input.focus();
+        }
+
+        function removeTagFromLibraryEntry(id, tag) {
+            const library = loadLibrary();
+            const item = library.find(x => x.id === id);
+            if (item && item.tags) {
+                item.tags = item.tags.filter(t => t !== tag);
+                saveLibrary(library);
+            }
+            renderLibrary();
+        }
+
+        function deleteLibraryEntry(id) {
+            if (!confirm("Are you sure you want to delete this saved prompt from your library?")) return;
+            const library = loadLibrary();
+            const filtered = library.filter(x => x.id !== id);
+            saveLibrary(filtered);
+            if (currentLibraryId === id) {
+                currentLibraryId = null;
+            }
+            renderLibrary();
+            showToast("Prompt deleted from library.");
+        }
+
+        function loadLibraryEntry(id, versionIdx) {
+            const library = loadLibrary();
+            const item = library.find(x => x.id === id);
+            if (!item) return;
+            const version = item.versions[versionIdx];
+            if (!version) return;
+            
+            currentLibraryId = id;
+            
+            const rawPromptEl = document.getElementById("rawPrompt");
+            rawPromptEl.value = version.raw || "";
+            rawPromptEl.dispatchEvent(new Event("input"));
+            
+            document.getElementById("strength").value = version.strength || "balanced";
+            updateStrengthHint();
+            setChipGroupValue("targetChips", version.targetModel || "");
+            setChipGroupValue("lengthChips", version.length || "standard");
+            setChipGroupValue("qualityChips", version.depth || "standard");
+            
+            // Restore techniques checkboxes
+            document.querySelectorAll(".technique-checkbox").forEach(cb => {
+                cb.checked = version.techniques && version.techniques.includes(cb.value);
+            });
+            
+            renderOptimizedResult(version.optimized || "", version.explanation || "", version.model, version.raw || "");
+
+            // Transition to result state in single-column layout
+            document.getElementById("inputPanel").style.display = "none";
+            document.getElementById("inputContextBar").style.display = "flex";
+            document.getElementById("resultPanel").style.display = "flex";
+            
+            document.getElementById("contextSnippet").innerText = version.raw || "";
+            const targetName = version.targetModel ? (version.targetModel.charAt(0).toUpperCase() + version.targetModel.slice(1)) : "Generic";
+            const lengthName = (version.length || "standard").charAt(0).toUpperCase() + (version.length || "standard").slice(1);
+            document.getElementById("contextMeta").innerHTML = `
+                <span class="context-meta-badge">${targetName}</span>
+                <span class="context-meta-badge">${lengthName}</span>
+            `;
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            showToast(`Loaded "${item.name}" (v${versionIdx + 1})`);
         }
 
         function saveToLibrary() {
             const text = currentOptimizedText.trim();
             if (!text) return;
-            try {
-                const raw = localStorage.getItem(LIBRARY_KEY);
-                const library = raw ? JSON.parse(raw) : [];
-                library.unshift({ text, label: text.slice(0, 60), timestamp: Date.now() });
-                localStorage.setItem(LIBRARY_KEY, JSON.stringify(library.slice(0, 100)));
-                showToast("Saved to library (stored locally in your browser).");
-            } catch (err) {
-                showToast("Failed to save to library.", true);
+            
+            const titleInput = document.getElementById("savePromptTitle");
+            const tagsInput = document.getElementById("savePromptTags");
+            const typeGroup = document.getElementById("savePromptTypeGroup");
+            
+            // Default title suggestion
+            let suggestedTitle = "";
+            if (currentLibraryId) {
+                const library = loadLibrary();
+                const item = library.find(x => x.id === currentLibraryId);
+                if (item) {
+                    suggestedTitle = item.name;
+                    tagsInput.value = (item.tags || []).join(", ");
+                }
+                typeGroup.style.display = "block";
+                document.getElementById("saveOptionVersion").checked = true;
+                titleInput.disabled = true;
+            } else {
+                suggestedTitle = "Prompt " + new Date().toLocaleDateString();
+                tagsInput.value = "";
+                typeGroup.style.display = "none";
+                titleInput.disabled = false;
             }
+            titleInput.value = suggestedTitle;
+            
+            document.getElementById("savePromptModal").classList.add("open");
+        }
+
+        function toggleSaveOptionTitle() {
+            const isVersion = document.getElementById("saveOptionVersion").checked;
+            document.getElementById("savePromptTitle").disabled = isVersion;
+            if (isVersion && currentLibraryId) {
+                const library = loadLibrary();
+                const item = library.find(x => x.id === currentLibraryId);
+                if (item) {
+                    document.getElementById("savePromptTitle").value = item.name;
+                }
+            }
+        }
+
+        function closeSavePromptModal() {
+            document.getElementById("savePromptModal").classList.remove("open");
+        }
+
+        function confirmSavePrompt() {
+            const title = document.getElementById("savePromptTitle").value.trim();
+            const tagsText = document.getElementById("savePromptTags").value.trim();
+            if (!title) {
+                showToast("Please enter a title.", true);
+                return;
+            }
+
+            const tags = tagsText ? tagsText.split(",").map(t => t.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "")).filter(Boolean) : [];
+            const text = currentOptimizedText.trim();
+            const raw = currentRawPrompt.trim();
+            const depth = document.getElementById("depth").value || "standard";
+            const length = document.getElementById("length").value || "standard";
+            const targetModel = document.getElementById("targetModel").value || "";
+            const strength = document.getElementById("strength").value || "balanced";
+            const techniques = Array.from(document.querySelectorAll(".technique-checkbox:checked")).map(cb => cb.value);
+            
+            const library = loadLibrary();
+            const isVersion = currentLibraryId && document.getElementById("saveOptionVersion").checked;
+            
+            const newVersion = {
+                raw,
+                optimized: text,
+                explanation: currentExplanationText,
+                targetModel,
+                length,
+                depth,
+                strength,
+                techniques,
+                timestamp: Date.now()
+            };
+
+            if (isVersion) {
+                const item = library.find(x => x.id === currentLibraryId);
+                if (item) {
+                    item.versions.push(newVersion);
+                    item.tags = Array.from(new Set([...(item.tags || []), ...tags]));
+                    showToast(`Saved new version to "${item.name}".`);
+                }
+            } else {
+                const newItem = {
+                    id: "lib_" + Date.now(),
+                    name: title,
+                    tags: tags,
+                    versions: [newVersion]
+                };
+                library.unshift(newItem);
+                currentLibraryId = newItem.id;
+                showToast(`Saved "${title}" to library.`);
+            }
+
+            saveLibrary(library);
+            closeSavePromptModal();
+            
+            if (currentLibraryTab === "library") {
+                renderLibrary();
+            }
+        }
+
+        function openExportModal() {
+            if (!currentOptimizedText.trim()) return;
+            document.getElementById("exportModal").classList.add("open");
+        }
+
+        function closeExportModal() {
+            document.getElementById("exportModal").classList.remove("open");
+        }
+
+        function downloadPrompt(format) {
+            const text = compilePrompt();
+            const titleInput = document.getElementById("savePromptTitle");
+            const title = titleInput ? titleInput.value.trim() : "optimized-prompt";
+            const filename = (title ? title.toLowerCase().replace(/[^a-z0-9]/g, "-") : "optimized-prompt");
+            
+            let blobContent = "";
+            let mimeType = "text/plain";
+            let fileExt = "txt";
+            
+            const depth = document.getElementById("depth").value || "standard";
+            const length = document.getElementById("length").value || "standard";
+            const targetModel = document.getElementById("targetModel").value || "generic";
+            const strength = document.getElementById("strength").value || "balanced";
+
+            if (format === "markdown") {
+                blobContent = `# Optimized Prompt\n\n${text}\n\n## Metadata\n- **Target Model**: ${targetModel}\n- **Length**: ${length}\n- **Depth**: ${depth}\n- **Optimization Strength**: ${strength}\n- **Exported At**: ${new Date().toLocaleString()}\n`;
+                mimeType = "text/markdown";
+                fileExt = "md";
+            } else if (format === "text") {
+                blobContent = text;
+                mimeType = "text/plain";
+                fileExt = "txt";
+            } else if (format === "json") {
+                // Find variables
+                const matches = text.match(PLACEHOLDER_REGEX) || [];
+                const variables = Array.from(new Set(matches));
+                const data = {
+                    prompt: text,
+                    variables: variables,
+                    metadata: {
+                        targetModel,
+                        length,
+                        depth,
+                        strength,
+                        timestamp: Date.now()
+                    }
+                };
+                blobContent = JSON.stringify(data, null, 2);
+                mimeType = "application/json";
+                fileExt = "json";
+            }
+
+            const blob = new Blob([blobContent], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${filename || "prompt"}.${fileExt}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            closeExportModal();
+            showToast(`Downloaded prompt as ${fileExt.toUpperCase()}.`);
         }
 
         function showToast(message, isError) {
