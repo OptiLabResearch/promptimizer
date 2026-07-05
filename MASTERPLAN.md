@@ -382,6 +382,27 @@ Files to read first: MASTERPLAN.md, public/index.html, functions/_lib/optimizer.
 How to run/verify: Run `npm run dev` to start wrangler pages local server at http://localhost:8788. Verify prompt optimizations fetch real responses using local secrets from `.dev.vars`.
 ```
 
+```
+Handoff: Phase 3 -> Metrics & Analytics
+
+Project path: /root/prompt-optimizer (git repo, branch: master)
+
+Project: A standalone prompt-optimization tool (Cloudflare Pages + Functions, no framework, no accounts/login).
+
+What was completed this phase (Phase 3, "Retention & conversion features" — see MASTERPLAN.md §3):
+- Presets Catalog: Clickable chips below the raw input textarea to quickly try 6 diverse template scenarios (coding, data extraction, article summarizer,Support Ticket classifier, Social post writer, SQL query generator).
+- Upgraded Local Storage Library: A beautiful, dual-tab library ("Saved Prompts") and history ("Recent Runs") panel. Supports real-time text/tag searching, version selectors (v1, v2, etc.), inline prompt renaming, and tag chip additions/removals directly.
+- Export Modal: Added client-side download controls offering compiled prompts as Markdown (.md), plain text (.txt), or structured JSON (with variables schema and metadata).
+- Dedicated Test Bench (State 3): Transition layout to test original vs optimized compiled prompts side-by-side with an optional test input query block. Includes a client-side Verdict Strip analyzing length differences, paragraph/bullet/XML structure, and target model formatting adherence heuristics, plus quick-actions to save the winner to the library.
+
+Next tasks:
+- Metrics/Analytics Instrumentation (§4b): Set up Cloudflare Workers Analytics Engine or a tiny beacon tracker to measure success metrics (Copy rate per optimization, placeholdered copies rate, Test Both usage rate, paste->copy duration).
+
+Files to read first: MASTERPLAN.md, public/index.html, functions/_lib/optimizer.js.
+
+How to run/verify: Run `npm run dev` to start wrangler dev server on http://localhost:8788. Run manual smoke tests on the presets, library tab, renaming/tags, export modals, and the elevated Test Bench.
+```
+
 ---
 
 
