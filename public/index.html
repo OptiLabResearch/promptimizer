@@ -66,10 +66,7 @@
             font-family: 'Outfit', sans-serif;
             font-size: 1.5rem;
             font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--text-primary);
             display: flex;
             align-items: center;
             gap: 0.75rem;
@@ -112,25 +109,15 @@
 
         h2 {
             font-family: 'Outfit', sans-serif;
-            font-size: 1.35rem;
+            font-size: 1.05rem;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             display: flex;
             align-items: center;
             gap: 0.75rem;
             color: var(--text-primary);
             letter-spacing: -0.2px;
-        }
-
-        h2 span.icon {
-            background: rgba(139, 92, 246, 0.15);
-            border-radius: 8px;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
+            text-transform: none;
         }
 
         textarea {
@@ -1118,7 +1105,7 @@
 
         <!-- Input Panel -->
         <div class="panel" id="inputPanel">
-            <h2><span class="icon">📝</span> Raw Input Prompt</h2>
+            <h2>Raw Input Prompt</h2>
             <textarea id="rawPrompt" maxlength="30000" placeholder="Paste your raw, simple, or draft prompt here... (e.g. 'write a story about a futuristic gardener')"></textarea>
             <div id="charCount" style="text-align: right; font-size: 0.75rem; color: var(--text-secondary); margin-top: -0.5rem;">0 / 30,000</div>
             <div class="field-error" id="promptError">Please enter a prompt to optimize.</div>
@@ -1129,7 +1116,7 @@
 
             <details id="optionsDetails" style="margin-bottom: 1.5rem; border: 1px solid var(--card-border); border-radius: 16px; background: rgba(255, 255, 255, 0.45); transition: all 0.25s ease;">
                 <summary style="cursor: pointer; padding: 0.85rem 1.25rem; font-weight: 600; color: var(--text-primary); font-size: 0.95rem; user-select: none; display: flex; align-items: center; justify-content: space-between; outline: none;">
-                    <span style="display: flex; align-items: center; gap: 0.5rem;">⚙️ <span id="optionsSummaryText">Options</span></span>
+                    <span style="display: flex; align-items: center; gap: 0.5rem;"><span id="optionsSummaryText">Options</span></span>
                     <span class="details-chevron" style="transition: transform 0.2s; font-size: 0.8rem; color: var(--text-secondary);">▼</span>
                 </summary>
                 <div style="padding: 1.25rem; border-top: 1px solid var(--card-border); display: flex; flex-direction: column; gap: 1.25rem;">
@@ -1221,7 +1208,7 @@
         <!-- Output Panel -->
         <div class="panel" id="resultPanel" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
-                <h2 style="margin: 0;"><span class="icon">🚀</span> Optimized Result</h2>
+                <h2 style="margin: 0;">Optimized Result</h2>
                 <div class="segmented-control" id="viewSegmentedControl" style="display: none;">
                     <button type="button" class="segment-btn active" id="segmentPromptBtn" onclick="switchResultView('prompt')">Prompt</button>
                     <button type="button" class="segment-btn" id="segmentOutlineBtn" onclick="switchResultView('outline')">Outline</button>
@@ -1229,16 +1216,16 @@
             </div>
 
             <div class="result-action-row" id="stickyActionBar" style="display: none;">
-                <button type="button" class="btn primary-action copy-action" id="stickyCopyBtn" onclick="copyToClipboard()" style="min-width: 160px;"><span>📋</span> Copy prompt</button>
-                <button type="button" class="btn btn-ghost test-action" onclick="showTestSection()" style="flex-grow: 0; min-height: 44px; font-weight: 600; border-radius: 14px; padding: 0.85rem 1.5rem;">⚖️ Test it</button>
+                <button type="button" class="btn primary-action copy-action" id="stickyCopyBtn" onclick="copyToClipboard()" style="min-width: 160px;">Copy prompt</button>
+                <button type="button" class="btn btn-ghost test-action" onclick="showTestSection()" style="flex-grow: 0; min-height: 44px; font-weight: 600; border-radius: 14px; padding: 0.85rem 1.5rem;">Test it</button>
                 <div style="position: relative;">
                     <button type="button" class="btn btn-ghost" id="overflowMenuBtn" onclick="toggleOverflowMenu(event)" style="padding: 0.5rem 0.85rem; font-size: 1rem; min-height: 44px; display: flex; align-items: center; justify-content: center; flex-grow: 0; border-radius: 14px;" title="More options">⋯</button>
                     <div id="overflowMenu" class="dropdown-menu">
-                        <button type="button" onclick="triggerSaveFromMenu(event)" class="menu-item">💾 Save to library</button>
-                        <button type="button" onclick="triggerExportFromMenu(event)" class="menu-item">📥 Export prompt</button>
-                        <button type="button" id="overflowMenuDiffBtn" onclick="triggerDiffFromMenu(event)" class="menu-item">🔀 View diff</button>
-                        <button type="button" id="overflowMenuPreviewBtn" onclick="triggerPreviewFromMenu(event)" class="menu-item">🔍 Preview compiled prompt</button>
-                        <button type="button" onclick="triggerRefineFromMenu(event)" class="menu-item">✨ Refine prompt</button>
+                        <button type="button" onclick="triggerSaveFromMenu(event)" class="menu-item">Save to library</button>
+                        <button type="button" onclick="triggerExportFromMenu(event)" class="menu-item">Export prompt</button>
+                        <button type="button" id="overflowMenuDiffBtn" onclick="triggerDiffFromMenu(event)" class="menu-item">View diff</button>
+                        <button type="button" id="overflowMenuPreviewBtn" onclick="triggerPreviewFromMenu(event)" class="menu-item">Preview compiled prompt</button>
+                        <button type="button" onclick="triggerRefineFromMenu(event)" class="menu-item">Refine prompt</button>
                     </div>
                 </div>
             </div>
@@ -1283,7 +1270,7 @@
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem;">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <button type="button" class="copy-btn" onclick="goToResultState()" style="border: none; background: none; font-size: 1.1rem; color: var(--accent-purple); cursor: pointer; padding: 0.25rem 0.5rem; min-height: auto;" title="Back to Result">← Back</button>
-                    <h2 style="margin: 0;"><span class="icon">⚖️</span> Test Bench</h2>
+                    <h2 style="margin: 0;">Test Bench</h2>
                 </div>
                 <div style="font-size: 0.8rem; color: var(--text-secondary);">
                     Engine: <span id="testBenchModelBadge" style="font-weight: 600; color: var(--text-primary);">Default</span>
@@ -1309,18 +1296,18 @@
             <div id="testBenchVerdictStrip" style="display: none; margin-bottom: 1.5rem;"></div>
             
             <!-- Comparison Columns -->
-            <div class="test-columns" id="testBenchColumns" style="display: none; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+            <div class="test-bench-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
                 <div class="test-column" style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 0.25rem;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Original Prompt Response</span>
-                        <button type="button" class="copy-btn" onclick="saveWinner('original')" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; min-height: 32px;"><span class="btn-icon">🏆</span> Save Winner</button>
+                        <button type="button" class="copy-btn" onclick="saveWinner('original')" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; min-height: 32px;">Save Winner</button>
                     </div>
                     <div class="test-output" id="testBenchOriginalOutput" style="background: white; border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; min-height: 120px; white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.5; color: var(--text-primary);"></div>
                 </div>
                 <div class="test-column" style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 0.25rem;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Optimized Prompt Response</span>
-                        <button type="button" class="copy-btn primary-action" onclick="saveWinner('optimized')" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; min-height: 32px;"><span class="btn-icon">🏆</span> Save Winner</button>
+                        <button type="button" class="copy-btn primary-action" onclick="saveWinner('optimized')" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; min-height: 32px;">Save Winner</button>
                     </div>
                     <div class="test-output" id="testBenchOptimizedOutput" style="background: white; border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; min-height: 120px; white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.5; color: var(--text-primary);"></div>
                 </div>
@@ -2056,7 +2043,7 @@ Generate a query for: {{user_query}}`,
             
             const btn = document.getElementById("overflowMenuPreviewBtn");
             if (btn) {
-                btn.innerHTML = previewCompiledMode ? "✓ Preview compiled prompt" : "🔍 Preview compiled prompt";
+                btn.innerHTML = previewCompiledMode ? "Hide compiled prompt" : "Preview compiled prompt";
             }
             
             const promptView = document.getElementById("continuousPromptView");
@@ -2137,7 +2124,7 @@ Generate a query for: {{user_query}}`,
             previewCompiledMode = false;
 
             const previewMenuBtn = document.getElementById("overflowMenuPreviewBtn");
-            if (previewMenuBtn) previewMenuBtn.innerHTML = "🔍 Preview compiled prompt";
+            if (previewMenuBtn) previewMenuBtn.innerHTML = "Preview compiled prompt";
 
             // Extract unique placeholders
             const matches = currentOptimizedText.match(PLACEHOLDER_REGEX) || [];
@@ -2406,9 +2393,9 @@ Generate a query for: {{user_query}}`,
             copyBtn.removeAttribute("disabled");
 
             if (unfilledCount > 0) {
-                copyBtn.innerHTML = `<span>📋</span> Copy (${unfilledCount} to fill)`;
+                copyBtn.innerHTML = `Copy (${unfilledCount} to fill)`;
             } else {
-                copyBtn.innerHTML = `<span>📋</span> Copy prompt`;
+                copyBtn.innerHTML = `Copy prompt`;
             }
         }
 
@@ -3484,7 +3471,7 @@ Generate a query for: {{user_query}}`,
                 
                 const copyBtn = document.getElementById("stickyCopyBtn");
                 if (copyBtn) {
-                    copyBtn.innerHTML = `<span>📋</span> Copy anyway`;
+                    copyBtn.innerHTML = `Copy anyway`;
                 }
                 return;
             }
@@ -3493,7 +3480,7 @@ Generate a query for: {{user_query}}`,
             navigator.clipboard.writeText(text).then(() => {
                 const copyBtn = document.getElementById("stickyCopyBtn");
                 if (copyBtn) {
-                    copyBtn.innerHTML = "<span>✓</span> Copied!";
+                    copyBtn.innerHTML = "Copied!";
                     copyBtn.classList.add("success");
                     setTimeout(() => {
                         copyBtn.classList.remove("success");
