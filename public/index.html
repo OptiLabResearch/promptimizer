@@ -355,32 +355,20 @@
             transform: scale(1.02);
         }
 
-        /* Bottom-Sticky Action Bar */
-        .sticky-action-bar {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(12px);
-            border-top: 1px solid var(--card-border);
-            padding: 1rem 2.5rem;
+        .result-action-row {
             display: flex;
-            justify-content: flex-end;
             align-items: center;
             gap: 0.75rem;
-            z-index: 50;
-            box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.04);
-            border-bottom-left-radius: 24px;
-            border-bottom-right-radius: 24px;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
         }
 
         .dropdown-menu {
             display: none;
             position: absolute;
-            bottom: 100%;
+            top: 100%;
             right: 0;
-            margin-bottom: 0.5rem;
+            margin-top: 0.5rem;
             background: white;
             border: 1px solid var(--card-border);
             border-radius: 12px;
@@ -1257,12 +1245,27 @@
 
         <!-- Output Panel -->
         <!-- Output Panel -->
-        <div class="panel" id="resultPanel" style="display: none; padding-bottom: 5.5rem; position: relative;">
+        <div class="panel" id="resultPanel" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
                 <h2 style="margin: 0;"><span class="icon">🚀</span> Optimized Result</h2>
                 <div class="segmented-control" id="viewSegmentedControl" style="display: none;">
                     <button type="button" class="segment-btn active" id="segmentPromptBtn" onclick="switchResultView('prompt')">Prompt</button>
                     <button type="button" class="segment-btn" id="segmentOutlineBtn" onclick="switchResultView('outline')">Outline</button>
+                </div>
+            </div>
+
+            <div class="result-action-row" id="stickyActionBar" style="display: none;">
+                <button type="button" class="btn primary-action copy-action" id="stickyCopyBtn" onclick="copyToClipboard()" style="min-width: 160px;"><span>📋</span> Copy prompt</button>
+                <button type="button" class="btn btn-ghost test-action" onclick="showTestSection()" style="flex-grow: 0; min-height: 44px; font-weight: 600; border-radius: 14px; padding: 0.85rem 1.5rem;">⚖️ Test it</button>
+                <div style="position: relative;">
+                    <button type="button" class="btn btn-ghost" id="overflowMenuBtn" onclick="toggleOverflowMenu(event)" style="padding: 0.5rem 0.85rem; font-size: 1rem; min-height: 44px; display: flex; align-items: center; justify-content: center; flex-grow: 0; border-radius: 14px;" title="More options">⋯</button>
+                    <div id="overflowMenu" class="dropdown-menu">
+                        <button type="button" onclick="triggerSaveFromMenu(event)" class="menu-item">💾 Save to library</button>
+                        <button type="button" onclick="triggerExportFromMenu(event)" class="menu-item">📥 Export prompt</button>
+                        <button type="button" id="overflowMenuDiffBtn" onclick="triggerDiffFromMenu(event)" class="menu-item">🔀 View diff</button>
+                        <button type="button" id="overflowMenuPreviewBtn" onclick="triggerPreviewFromMenu(event)" class="menu-item">🔍 Preview compiled prompt</button>
+                        <button type="button" onclick="triggerRefineFromMenu(event)" class="menu-item">✨ Refine prompt</button>
+                    </div>
                 </div>
             </div>
 
@@ -1297,22 +1300,6 @@
 
             <div style="text-align: center; margin-top: 1.25rem;">
                 <button type="button" class="copy-btn" style="margin: 0 auto; display: inline-flex;" onclick="restoreInputState()">↑ Optimize another prompt</button>
-            </div>
-
-            <!-- Sticky bottom action bar -->
-            <div class="sticky-action-bar" id="stickyActionBar" style="display: none;">
-                <button type="button" class="btn primary-action copy-action" id="stickyCopyBtn" onclick="copyToClipboard()" style="min-width: 160px;"><span>📋</span> Copy prompt</button>
-                <button type="button" class="btn btn-ghost test-action" onclick="showTestSection()" style="flex-grow: 0; min-height: 44px; font-weight: 600; border-radius: 14px; padding: 0.85rem 1.5rem;">⚖️ Test it</button>
-                <div style="position: relative;">
-                    <button type="button" class="btn btn-ghost" id="overflowMenuBtn" onclick="toggleOverflowMenu(event)" style="padding: 0.5rem 0.85rem; font-size: 1rem; min-height: 44px; display: flex; align-items: center; justify-content: center; flex-grow: 0; border-radius: 14px;" title="More options">⋯</button>
-                    <div id="overflowMenu" class="dropdown-menu">
-                        <button type="button" onclick="triggerSaveFromMenu(event)" class="menu-item">💾 Save to library</button>
-                        <button type="button" onclick="triggerExportFromMenu(event)" class="menu-item">📥 Export prompt</button>
-                        <button type="button" id="overflowMenuDiffBtn" onclick="triggerDiffFromMenu(event)" class="menu-item">🔀 View diff</button>
-                        <button type="button" id="overflowMenuPreviewBtn" onclick="triggerPreviewFromMenu(event)" class="menu-item">🔍 Preview compiled prompt</button>
-                        <button type="button" onclick="triggerRefineFromMenu(event)" class="menu-item">✨ Refine prompt</button>
-                    </div>
-                </div>
             </div>
 
         </div>
