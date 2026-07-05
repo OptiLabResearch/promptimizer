@@ -502,57 +502,7 @@
             margin-right: auto;
         }
 
-        .delta-bar {
-            margin-bottom: 1.25rem;
-            padding: 1rem 1.25rem;
-            background: rgba(16, 185, 129, 0.06);
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            border-left: 4px solid var(--success-green);
-            border-radius: 12px;
-        }
 
-        .delta-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-
-        .delta-chip {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: #065f46;
-            background: rgba(16, 185, 129, 0.14);
-            border-radius: 20px;
-            padding: 0.3rem 0.75rem;
-        }
-
-        .delta-chip.warning {
-            color: #92400e;
-            background: rgba(180, 83, 9, 0.14);
-        }
-
-        .delta-toggle {
-            background: none;
-            border: none;
-            color: var(--success-green);
-            font-size: 0.82rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.6rem 0;
-            min-height: 44px;
-        }
-
-        .delta-toggle .chevron {
-            display: inline-block;
-            transition: transform 0.2s ease;
-        }
-
-        .delta-toggle[aria-expanded="true"] .chevron {
-            transform: rotate(90deg);
-        }
 
         .chip-group {
             display: flex;
@@ -1099,38 +1049,7 @@
             border: 1px solid rgba(139, 92, 246, 0.1);
         }
 
-        .gate {
-            display: none;
-            margin-bottom: 1.25rem;
-            border: 1px solid #EAD9BF;
-            background: rgba(253, 243, 231, 0.9);
-            border-radius: 12px;
-            padding: 0.85rem 1.25rem;
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: #b45309;
-            align-items: center;
-            gap: 0.75rem;
-            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        .gate.done {
-            border-color: #CBE7DB;
-            background: rgba(234, 246, 241, 0.9);
-            color: #0e8a62;
-        }
-        .gate .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: currentColor;
-            flex: none;
-        }
-        .gate-link {
-            color: inherit;
-            text-decoration: underline;
-            font-weight: 700;
-            cursor: pointer;
-        }
+
 
         .sect {
             border: 1px solid var(--card-border);
@@ -1273,73 +1192,7 @@
         }
 
         /* Sandbox section styling */
-        .sandbox-section {
-            margin-top: 2rem;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 18px;
-            padding: 1.75rem;
-            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        .sandbox-section h3 {
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.15rem;
-            font-weight: 600;
-            margin-bottom: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .sandbox-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-        @media (max-width: 600px) {
-            .sandbox-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        .sandbox-field {
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
-        .sandbox-field label {
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .sandbox-field input {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.85);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 0.6rem 0.85rem;
-            font-family: monospace;
-            font-size: 0.85rem;
-        }
-        .sandbox-preview-wrapper {
-            margin-top: 1.25rem;
-            border-top: 1px solid var(--card-border);
-            padding-top: 0.75rem;
-        }
-        .sandbox-preview {
-            background: rgba(15, 23, 42, 0.02);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 1rem;
-            font-family: monospace;
-            font-size: 0.85rem;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            margin-top: 0.5rem;
-            max-height: 250px;
-            overflow-y: auto;
-        }
+
     </style>
 </head>
 <body>
@@ -2750,62 +2603,11 @@ Generate a query for: {{user_query}}`,
             return compiled;
         }
 
-        // ---- Variable Sandbox ----
-        function renderSandbox() {
-            const sandboxSection = document.getElementById("sandboxSection");
-            const sandboxGrid = document.getElementById("sandboxGrid");
-
-            if (currentPlaceholders.length === 0) {
-                sandboxSection.style.display = "none";
-                return;
-            }
-
-            sandboxSection.style.display = "block";
-            sandboxGrid.innerHTML = currentPlaceholders.map(token => {
-                const val = placeholderValues[token] || "";
-                return `
-                    <div class="sandbox-field">
-                        <label>${escapeHtml(token)}</label>
-                        <input type="text" data-token="${escapeHtml(token)}" value="${escapeHtml(val)}" oninput="onSandboxInput(this)" placeholder="Enter value...">
-                    </div>
-                `;
-            }).join("");
-
-            updateSandboxPreview();
-        }
-
-        function onSandboxInput(inputEl) {
-            const token = inputEl.getAttribute("data-token");
-            const value = inputEl.value;
-            placeholderValues[token] = value;
-            syncPlaceholderChips(token, value);
-            updateGateStatus();
-            updateSandboxPreview();
-        }
-
-        function updateSandboxInputs() {
-            const inputs = document.querySelectorAll("#sandboxGrid input");
-            inputs.forEach(input => {
-                const token = input.getAttribute("data-token");
-                input.value = placeholderValues[token] || "";
-            });
-            updateSandboxPreview();
-        }
-
-        function updateSandboxPreview() {
-            const previewEl = document.getElementById("sandboxPreview");
-            if (previewEl) {
-                previewEl.innerText = compilePrompt();
-            }
-        }
-
-        function toggleSandboxPreview() {
-            const toggle = document.getElementById("sandboxPreviewToggle");
-            const preview = document.getElementById("sandboxPreview");
-            const expanded = toggle.getAttribute("aria-expanded") === "true";
-            toggle.setAttribute("aria-expanded", String(!expanded));
-            preview.style.display = expanded ? "none" : "block";
-        }
+        // ---- Variable Sandbox (No-op) ----
+        function renderSandbox() {}
+        function updateSandboxInputs() {}
+        function updateSandboxPreview() {}
+        function toggleSandboxPreview() {}
 
         // ---- Inline Editing handler ----
         function onSectionFocus(el) {
