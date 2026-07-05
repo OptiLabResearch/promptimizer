@@ -7,8 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #f4f5fa;
-            --card-bg: rgba(255, 255, 255, 0.75);
+            --bg-color: #f7f7f9;
+            --card-bg: #ffffff;
             --card-border: rgba(15, 23, 42, 0.08);
             --accent-purple: #8b5cf6;
             --accent-pink: #d946ef;
@@ -42,9 +42,6 @@
 
         body {
             background-color: var(--bg-color);
-            background-image:
-                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.10) 0%, transparent 45%),
-                radial-gradient(circle at 90% 80%, rgba(217, 70, 239, 0.08) 0%, transparent 45%);
             color: var(--text-primary);
             min-height: 100vh;
             display: flex;
@@ -54,13 +51,12 @@
         }
 
         header {
-            padding: 1.5rem 3rem;
+            padding: 0.9rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: #ffffff;
             border-bottom: 1px solid var(--card-border);
-            backdrop-filter: blur(12px);
-            background: rgba(255, 255, 255, 0.6);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -106,19 +102,12 @@
         .panel {
             background: var(--card-bg);
             border: 1px solid var(--card-border);
-            border-radius: 24px;
-            padding: 2.5rem;
-            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 1.75rem;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
-            transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
             position: relative;
-        }
-
-        .panel:hover {
-            border-color: rgba(139, 92, 246, 0.25);
-            box-shadow: 0 25px 60px rgba(139, 92, 246, 0.05);
         }
 
         h2 {
@@ -147,15 +136,15 @@
         textarea {
             width: 100%;
             flex-grow: 1;
-            min-height: 420px;
-            background: rgba(255, 255, 255, 0.6);
+            min-height: 180px;
+            background: #ffffff;
             border: 1px solid var(--card-border);
-            border-radius: 18px;
-            padding: 1.5rem;
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
             color: var(--text-primary);
             font-size: 1rem;
             line-height: 1.6;
-            resize: none;
+            resize: vertical;
             outline: none;
             transition: all 0.25s ease;
         }
@@ -163,7 +152,7 @@
         textarea:focus {
             border-color: var(--accent-purple);
             box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
-            background: rgba(255, 255, 255, 0.9);
+            background: #ffffff;
         }
 
         .controls {
@@ -185,9 +174,9 @@
         }
 
         select, input[type="text"], input[type="password"] {
-            background: rgba(255, 255, 255, 0.85);
+            background: #ffffff;
             border: 1px solid var(--card-border);
-            border-radius: 14px;
+            border-radius: 10px;
             padding: 0.85rem 3rem 0.85rem 1.25rem;
             color: var(--text-primary);
             font-size: 0.95rem;
@@ -218,7 +207,7 @@
             background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
             color: white;
             border: none;
-            border-radius: 14px;
+            border-radius: 12px;
             padding: 0.85rem 2.25rem;
             font-weight: 600;
             font-size: 1rem;
@@ -233,13 +222,8 @@
         }
 
         .btn:hover {
-            transform: translateY(-2px);
             box-shadow: 0 12px 32px rgba(139, 92, 246, 0.4);
             filter: brightness(1.1);
-        }
-
-        .btn:active {
-            transform: translateY(0);
         }
 
         .btn:disabled {
@@ -259,9 +243,9 @@
         }
 
         .output-box {
-            background: rgba(255, 255, 255, 0.6);
+            background: #fbfbfc;
             border: 1px solid var(--card-border);
-            border-radius: 18px;
+            border-radius: 10px;
             padding: 1.5rem;
             flex-grow: 1;
             min-height: 120px;
@@ -269,11 +253,6 @@
             line-height: 1.6;
             white-space: pre-wrap;
             position: relative;
-            transition: all 0.25s ease;
-        }
-
-        .output-box:hover {
-            border-color: rgba(15, 23, 42, 0.15);
         }
 
         .output-placeholder {
@@ -342,7 +321,6 @@
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
-            backdrop-filter: blur(8px);
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -352,7 +330,6 @@
         .copy-btn:hover {
             background: rgba(15, 23, 42, 0.1);
             border-color: rgba(15, 23, 42, 0.2);
-            transform: scale(1.02);
         }
 
         .result-action-row {
@@ -447,7 +424,6 @@
         .btn-ghost:hover {
             background: rgba(139, 92, 246, 0.05);
             border-color: var(--accent-purple);
-            transform: translateY(-2px);
         }
 
         .copy-btn.success {
@@ -615,13 +591,13 @@
         }
 
         footer {
-            padding: 2rem;
+            padding: 1.25rem;
             text-align: center;
             font-size: 0.85rem;
             color: var(--text-secondary);
             border-top: 1px solid var(--card-border);
             margin-top: auto;
-            background: rgba(15, 23, 42, 0.02);
+            background: transparent;
         }
 
         footer a { color: var(--accent-purple); text-decoration: none; }
