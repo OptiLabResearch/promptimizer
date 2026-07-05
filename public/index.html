@@ -2005,6 +2005,45 @@ Generate a query for: {{user_query}}`,
                 });
             }
 
+            // Keyboard Shortcuts
+            window.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") {
+                    const overflowMenu = document.getElementById("overflowMenu");
+                    const overflowBtn = document.getElementById("overflowMenuBtn");
+                    if (overflowMenu && overflowMenu.style.display === "block") {
+                        overflowMenu.style.display = "none";
+                        if (overflowBtn) {
+                            overflowBtn.setAttribute("aria-expanded", "false");
+                            overflowBtn.focus();
+                        }
+                    }
+                    
+                    const saveModal = document.getElementById("savePromptModal");
+                    if (saveModal && saveModal.classList.contains("open")) {
+                        saveModal.classList.remove("open");
+                    }
+                    
+                    const exportModal = document.getElementById("exportModal");
+                    if (exportModal && exportModal.classList.contains("open")) {
+                        exportModal.classList.remove("open");
+                    }
+                }
+                
+                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                    const inputPanel = document.getElementById("inputPanel");
+                    const resultPanel = document.getElementById("resultPanel");
+                    
+                    if (inputPanel && inputPanel.style.display !== "none") {
+                        const optimizeBtn = document.getElementById("optimizeBtn");
+                        if (optimizeBtn && !optimizeBtn.disabled) {
+                            optimizeBtn.click();
+                        }
+                    } else if (resultPanel && resultPanel.style.display !== "none") {
+                        copyToClipboard();
+                    }
+                }
+            });
+
             currentLibraryId = null;
             switchLibraryTab('library');
             initPresets();
@@ -2281,14 +2320,20 @@ Generate a query for: {{user_query}}`,
         function toggleOverflowMenu(event) {
             event.stopPropagation();
             const menu = document.getElementById("overflowMenu");
-            if (!menu) return;
+            const btn = document.getElementById("overflowMenuBtn");
+            if (!menu || !btn) return;
             const isOpen = menu.style.display === "block";
             menu.style.display = isOpen ? "none" : "block";
+            btn.setAttribute("aria-expanded", String(!isOpen));
         }
 
         window.addEventListener("click", () => {
             const menu = document.getElementById("overflowMenu");
-            if (menu) menu.style.display = "none";
+            const btn = document.getElementById("overflowMenuBtn");
+            if (menu) {
+                menu.style.display = "none";
+                if (btn) btn.setAttribute("aria-expanded", "false");
+            }
         });
 
         function triggerSaveFromMenu(event) {
@@ -2374,7 +2419,7 @@ Generate a query for: {{user_query}}`,
             updateExplanationFooter();
             updateTokenEstimates();
 
-            refineSection.style.display = currentOptimizedText ? "block" : "none";
+            refineSection.style.display = "none";
             if (testBenchPanel) testBenchPanel.style.display = "none";
             document.getElementById("refineInput").value = "";
             
