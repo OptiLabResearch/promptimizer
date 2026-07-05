@@ -472,9 +472,34 @@
         }
 
         .chip.selected {
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
-            border-color: transparent;
-            color: #fff;
+            background: rgba(139, 92, 246, 0.12);
+            border-color: var(--accent-purple);
+            color: var(--accent-purple);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary {
+            list-style: none;
+        }
+
+        details[open] .details-chevron {
+            transform: rotate(180deg);
+        }
+
+        .preset-link {
+            color: var(--accent-purple);
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+            display: inline-block;
+        }
+
+        .preset-link:hover {
+            color: var(--accent-pink);
         }
 
         .control-row {
@@ -1239,82 +1264,97 @@
             <div id="charCount" style="text-align: right; font-size: 0.75rem; color: var(--text-secondary); margin-top: -0.5rem;">0 / 30,000</div>
             <div class="field-error" id="promptError">Please enter a prompt to optimize.</div>
 
-            <div id="presetCatalog" style="margin: 0.5rem 0 1rem 0;">
-                <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Try a sample prompt:</div>
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;" id="presetChips"></div>
+            <div id="presetCatalog" style="margin: 0.75rem 0 1rem 0; font-size: 0.85rem; color: var(--text-secondary);">
+                Try a sample: <span id="presetLinks"></span>
             </div>
 
-            <div class="technique-row">
-                <label class="technique-option" title="Only helps on small non-reasoning models; on reasoning models we recommend a thinking-budget note instead."><input type="checkbox" class="technique-checkbox" value="cot"> Chain-of-thought</label>
-                <label class="technique-option" title="Include 2-3 curated contrastive examples (including a near-miss negative) consistent with all stated rules."><input type="checkbox" class="technique-checkbox" value="fewshot"> Few-shot examples</label>
-                <label class="technique-option" title="Use XML tags as the delimiter dialect regardless of target model default."><input type="checkbox" class="technique-checkbox" value="xml"> XML structure</label>
-                <label class="technique-option" title="Use variable placeholders like {{like_this}}, placing input data at the bottom and reference materials at the top."><input type="checkbox" class="technique-checkbox" value="placeholders"> Variable placeholders</label>
-            </div>
+            <details id="optionsDetails" style="margin-bottom: 1.5rem; border: 1px solid var(--card-border); border-radius: 16px; background: rgba(255, 255, 255, 0.45); transition: all 0.25s ease;">
+                <summary style="cursor: pointer; padding: 0.85rem 1.25rem; font-weight: 600; color: var(--text-primary); font-size: 0.95rem; user-select: none; display: flex; align-items: center; justify-content: space-between; outline: none;">
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">⚙️ <span id="optionsSummaryText">Options</span></span>
+                    <span class="details-chevron" style="transition: transform 0.2s; font-size: 0.8rem; color: var(--text-secondary);">▼</span>
+                </summary>
+                <div style="padding: 1.25rem; border-top: 1px solid var(--card-border); display: flex; flex-direction: column; gap: 1.25rem;">
+                    <!-- Style (was Length) -->
+                    <div class="control-row" style="margin-top: 0;">
+                        <span class="control-row-label">Style:</span>
+                        <div class="chip-group" id="lengthChips" title="How long and detailed the rewritten prompt itself should be">
+                            <button type="button" class="chip" data-value="concise" onclick="selectChip('lengthChips', this)">Concise</button>
+                            <button type="button" class="chip selected" data-value="standard" onclick="selectChip('lengthChips', this)">Balanced</button>
+                            <button type="button" class="chip" data-value="full" onclick="selectChip('lengthChips', this)">Detailed</button>
+                        </div>
+                        <input type="hidden" id="length" value="standard">
+                    </div>
+                    <div class="field-hint" id="lengthHint" style="margin-top: -0.75rem; font-size: 0.8rem; color: var(--text-secondary);">Balanced: strikes an even balance between conciseness, clarity, and contextual detail.</div>
 
-            <div class="control-row">
-                <span class="control-row-label">Length:</span>
-                <div class="chip-group" id="lengthChips" title="How long the rewritten prompt itself should be, independent of the style chosen below">
-                    <button type="button" class="chip" data-value="concise" onclick="selectChip('lengthChips', this)">Concise</button>
-                    <button type="button" class="chip selected" data-value="standard" onclick="selectChip('lengthChips', this)">Standard</button>
-                    <button type="button" class="chip" data-value="full" onclick="selectChip('lengthChips', this)">Full</button>
+                    <!-- Quality -->
+                    <div class="control-row" style="margin-top: 0;">
+                        <span class="control-row-label">Quality:</span>
+                        <div class="chip-group" id="qualityChips" title="Deep runs a second self-critique pass — better prompts, ~2x latency/cost.">
+                            <button type="button" class="chip selected" data-value="standard" onclick="selectChip('qualityChips', this)">Standard</button>
+                            <button type="button" class="chip" data-value="deep" onclick="selectChip('qualityChips', this)">Deep (2-pass)</button>
+                        </div>
+                        <input type="hidden" id="depth" value="standard">
+                    </div>
+
+                    <!-- Optimize for -->
+                    <div class="control-row" style="margin-top: 0;">
+                        <span class="control-row-label">Optimize for:</span>
+                        <div class="chip-group" id="targetChips" title="Which model the optimized prompt is written for">
+                            <button type="button" class="chip selected" data-value="" onclick="selectChip('targetChips', this)">Generic</button>
+                            <button type="button" class="chip" data-value="claude" onclick="selectChip('targetChips', this)">Claude</button>
+                            <button type="button" class="chip" data-value="gpt" onclick="selectChip('targetChips', this)">GPT</button>
+                            <button type="button" class="chip" data-value="gemini" onclick="selectChip('targetChips', this)">Gemini</button>
+                            <button type="button" class="chip" data-value="local" onclick="selectChip('targetChips', this)">Small Local</button>
+                        </div>
+                        <input type="hidden" id="targetModel" value="">
+                    </div>
+
+                    <!-- Techniques to apply -->
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem;">
+                        <span class="control-row-label" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Techniques to apply:</span>
+                        <div class="technique-row" style="margin-top: 0; display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;">
+                            <label class="technique-option" title="Only helps on small non-reasoning models; on reasoning models we recommend a thinking-budget note instead." style="font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" class="technique-checkbox" value="cot" onchange="updateOptionsSummary()"> Chain-of-thought</label>
+                            <label class="technique-option" title="Include 2-3 curated contrastive examples (including a near-miss negative) consistent with all stated rules." style="font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" class="technique-checkbox" value="fewshot" onchange="updateOptionsSummary()"> Few-shot examples</label>
+                            <label class="technique-option" title="Use XML tags as the delimiter dialect regardless of target model default." style="font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" class="technique-checkbox" value="xml" onchange="updateOptionsSummary()"> XML structure</label>
+                            <label class="technique-option" title="Use variable placeholders like {{like_this}}, placing input data at the bottom and reference materials at the top." style="font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" class="technique-checkbox" value="placeholders" onchange="updateOptionsSummary()"> Variable placeholders</label>
+                        </div>
+                    </div>
                 </div>
-                <input type="hidden" id="length" value="standard">
-            </div>
-            <div class="field-hint" id="lengthHint">Standard: proportionate length — expands only what clarity requires.</div>
+            </details>
 
-            <div class="control-row">
-                <span class="control-row-label">Quality:</span>
-                <div class="chip-group" id="qualityChips" title="Deep runs a second self-critique pass — better prompts, ~2x latency/cost.">
-                    <button type="button" class="chip selected" data-value="standard" onclick="selectChip('qualityChips', this)">Standard</button>
-                    <button type="button" class="chip" data-value="deep" onclick="selectChip('qualityChips', this)">Deep (2-pass)</button>
-                </div>
-                <input type="hidden" id="depth" value="standard">
-            </div>
-
-            <div class="control-row">
-                <span class="control-row-label">Optimize for:</span>
-                <div class="chip-group" id="targetChips" title="Which model the optimized prompt is written for">
-                    <button type="button" class="chip selected" data-value="" onclick="selectChip('targetChips', this)">Generic</button>
-                    <button type="button" class="chip" data-value="claude" onclick="selectChip('targetChips', this)">Claude</button>
-                    <button type="button" class="chip" data-value="gpt" onclick="selectChip('targetChips', this)">GPT</button>
-                    <button type="button" class="chip" data-value="gemini" onclick="selectChip('targetChips', this)">Gemini</button>
-                    <button type="button" class="chip" data-value="local" onclick="selectChip('targetChips', this)">Small Local</button>
-                </div>
-                <input type="hidden" id="targetModel" value="">
-            </div>
-
-            <div class="controls">
-                <div class="select-wrapper">
-                    <select id="strength" onchange="updateStrengthHint()">
-                        <option value="balanced">Balanced Optimize</option>
-                        <option value="concise">Concise Focus</option>
-                        <option value="detailed">Detailed Structure</option>
-                        <option value="critique">Critique Only</option>
-                    </select>
-                </div>
-                <button class="btn" id="optimizeBtn" onclick="optimizePrompt()" disabled>
+            <div class="controls" style="margin-top: 1rem; margin-bottom: 1.5rem;">
+                <input type="hidden" id="strength" value="balanced">
+                <button class="btn" id="optimizeBtn" onclick="optimizePrompt()" disabled style="flex: 1;">
                     <span class="loader" id="loader"></span>
                     <span id="btnText">Optimize Prompt</span>
                 </button>
             </div>
-            <div class="field-hint" id="strengthHint">Strikes an even balance between conciseness, clarity, and contextual detail.</div>
 
-            <div class="history-section">
-                <!-- Dual-Tab Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--card-border); margin-bottom: 1rem; padding-bottom: 0.25rem;">
-                    <div style="display: flex; gap: 1rem;">
-                        <button type="button" class="tab-btn active" id="tabLibraryBtn" onclick="switchLibraryTab('library')">Saved Prompts (Library)</button>
-                        <button type="button" class="tab-btn" id="tabHistoryBtn" onclick="switchLibraryTab('history')">Recent Runs (History)</button>
+            <div id="libraryHistorySection" style="margin-top: 1.5rem; display: none;">
+                <!-- Quiet Trigger Row -->
+                <div id="libraryHistoryTrigger" onclick="toggleLibraryHistoryPanel()" style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem; user-select: none;">
+                    <span class="chevron" id="libraryHistoryChevron" style="font-size: 0.75rem; transition: transform 0.2s; display: inline-block;">▶</span>
+                    <span id="libraryHistoryTriggerText" class="preset-link" style="text-decoration: none;">📚 Library (0) · Recent runs (0)</span>
+                </div>
+                
+                <!-- The actual panel (starts collapsed) -->
+                <div id="libraryHistoryPanel" style="display: none; border-top: 1px dashed var(--card-border); padding-top: 1rem;">
+                    <!-- Dual-Tab Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--card-border); margin-bottom: 1rem; padding-bottom: 0.25rem;">
+                        <div style="display: flex; gap: 1rem;">
+                            <button type="button" class="tab-btn active" id="tabLibraryBtn" onclick="switchLibraryTab('library')">Saved Prompts (Library)</button>
+                            <button type="button" class="tab-btn" id="tabHistoryBtn" onclick="switchLibraryTab('history')">Recent Runs (History)</button>
+                        </div>
+                        <button class="clear-history-btn" id="clearHistoryBtn" onclick="clearHistory()" style="display: none;">Clear history</button>
                     </div>
-                    <button class="clear-history-btn" id="clearHistoryBtn" onclick="clearHistory()" style="display: none;">Clear history</button>
+                    
+                    <!-- Library Search -->
+                    <div id="librarySearchRow" style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center;">
+                        <input type="text" id="librarySearchInput" oninput="renderLibrary()" placeholder="Search library by name, tag, or content..." style="flex: 1; font-size: 0.85rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.85); outline: none;">
+                    </div>
+                    
+                    <div class="history-list open" id="historyList"></div>
                 </div>
-                
-                <!-- Library Search (Only visible when Library tab is active) -->
-                <div id="librarySearchRow" style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center;">
-                    <input type="text" id="librarySearchInput" oninput="renderLibrary()" placeholder="Search library by name, tag, or content..." style="flex: 1; font-size: 0.85rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.85); outline: none;">
-                </div>
-                
-                <div class="history-list open" id="historyList"></div>
             </div>
         </div>
 
@@ -1604,22 +1644,94 @@
             };
         }
 
-        const LENGTH_HINTS = {
-            concise: "Concise: keep the rewritten prompt tight — close to the input's length, no padding.",
-            standard: "Standard: proportionate length — expands only what clarity requires.",
-            full: "Full: expand freely with comprehensive context, instructions, and edge cases.",
-        };
-
-        const STRENGTH_HINTS = {
-            balanced: "Strikes an even balance between conciseness, clarity, and contextual detail.",
-            concise: "Favors a tight, direct structure — trims anything not essential to the task.",
-            detailed: "Expands with thorough context, edge cases, and explicit constraints.",
-            critique: "Doesn't rewrite the prompt — scores it on Outcome Clarity, Structure, Output Contract, and Robustness.",
+        const STYLE_HINTS = {
+            concise: "Concise: short and tight prompt, favoring brevity.",
+            standard: "Balanced: strikes an even balance between conciseness, clarity, and contextual detail.",
+            full: "Detailed: rich structure, detailed instructions and constraints."
         };
 
         function updateStrengthHint() {
-            const strength = document.getElementById("strength").value;
-            document.getElementById("strengthHint").innerText = STRENGTH_HINTS[strength] || STRENGTH_HINTS.balanced;
+            // No-op for compatibility
+        }
+
+        function updateOptionsSummary() {
+            const summaryTextEl = document.getElementById("optionsSummaryText");
+            if (!summaryTextEl) return;
+            
+            const parts = ["Options"];
+            
+            // Style (Length)
+            const lengthVal = document.getElementById("length").value;
+            if (lengthVal === "concise") {
+                parts.push("Concise");
+            } else if (lengthVal === "full") {
+                parts.push("Detailed");
+            }
+            
+            // Quality
+            const depthVal = document.getElementById("depth").value;
+            if (depthVal === "deep") {
+                parts.push("Deep");
+            }
+            
+            // Target Model
+            const targetVal = document.getElementById("targetModel").value;
+            const targetNames = {
+                claude: "Claude",
+                gpt: "GPT",
+                gemini: "Gemini",
+                local: "Small Local"
+            };
+            if (targetVal && targetNames[targetVal]) {
+                parts.push(targetNames[targetVal]);
+            }
+            
+            // Techniques
+            const checkboxes = document.querySelectorAll(".technique-checkbox:checked");
+            const techNames = {
+                cot: "CoT",
+                fewshot: "Few-shot",
+                xml: "XML",
+                placeholders: "Placeholders"
+            };
+            checkboxes.forEach(cb => {
+                if (techNames[cb.value]) {
+                    parts.push(techNames[cb.value]);
+                }
+            });
+            
+            summaryTextEl.innerText = parts.join(" · ");
+        }
+
+        function updateLibraryHistoryVisibility() {
+            const library = loadLibrary();
+            const history = loadHistory();
+            const section = document.getElementById("libraryHistorySection");
+            const triggerText = document.getElementById("libraryHistoryTriggerText");
+            
+            if (library.length === 0 && history.length === 0) {
+                if (section) section.style.display = "none";
+                return;
+            }
+            
+            if (section) section.style.display = "block";
+            if (triggerText) {
+                triggerText.innerText = `📚 Library (${library.length}) · Recent runs (${history.length})`;
+            }
+        }
+
+        function toggleLibraryHistoryPanel() {
+            const panel = document.getElementById("libraryHistoryPanel");
+            const chevron = document.getElementById("libraryHistoryChevron");
+            if (!panel || !chevron) return;
+            if (panel.style.display === "none") {
+                panel.style.display = "block";
+                chevron.style.transform = "rotate(90deg)";
+                switchLibraryTab(currentLibraryTab);
+            } else {
+                panel.style.display = "none";
+                chevron.style.transform = "rotate(0deg)";
+            }
         }
 
         function selectChip(groupId, el) {
@@ -1629,12 +1741,13 @@
             const value = el.dataset.value || "";
             if (groupId === "lengthChips") {
                 document.getElementById("length").value = value;
-                document.getElementById("lengthHint").innerText = LENGTH_HINTS[value] || LENGTH_HINTS.standard;
+                document.getElementById("lengthHint").innerText = STYLE_HINTS[value] || STYLE_HINTS.standard;
             } else if (groupId === "targetChips") {
                 document.getElementById("targetModel").value = value;
             } else if (groupId === "qualityChips") {
                 document.getElementById("depth").value = value;
             }
+            updateOptionsSummary();
         }
 
         function setChipGroupValue(groupId, value) {
@@ -1709,12 +1822,29 @@ Generate a query for: {{user_query}}`,
             }
         ];
 
-        function initPresets() {
-            const container = document.getElementById("presetChips");
+        function initPresets(showAll = false) {
+            const container = document.getElementById("presetLinks");
             if (!container) return;
-            container.innerHTML = PRESETS.map((p, idx) => {
-                return `<button type="button" class="chip" onclick="loadPreset(${idx})">${escapeHtml(p.title)}</button>`;
-            }).join("");
+            
+            const firstThree = [
+                { idx: 0, label: "Coding" },
+                { idx: 1, label: "Data extraction" },
+                { idx: 2, label: "Summarizer" }
+            ];
+            const remaining = [
+                { idx: 3, label: "Support Ticket" },
+                { idx: 4, label: "Social Post" },
+                { idx: 5, label: "SQL Query" }
+            ];
+
+            let html = firstThree.map(p => `<span class="preset-link" onclick="loadPreset(${p.idx})">${p.label}</span>`).join(" · ");
+            
+            if (showAll) {
+                html += " · " + remaining.map(p => `<span class="preset-link" onclick="loadPreset(${p.idx})">${p.label}</span>`).join(" · ");
+            } else {
+                html += ` · <span class="preset-link" id="morePresetsBtn" onclick="initPresets(true)">more ▾</span>`;
+            }
+            container.innerHTML = html;
         }
 
         function loadPreset(idx) {
@@ -1747,13 +1877,30 @@ Generate a query for: {{user_query}}`,
                 const hasText = rawPromptEl.value.trim().length > 0;
                 optimizeBtn.disabled = !hasText;
                 if (hasText) promptErrorEl.classList.remove("show");
+
+                const presetCatalog = document.getElementById("presetCatalog");
+                if (presetCatalog) {
+                    presetCatalog.style.display = hasText ? "none" : "block";
+                }
             };
             rawPromptEl.addEventListener("input", updateCharCount);
             updateCharCount();
 
+            // Load optionsDetails open/closed state
+            const optionsDetails = document.getElementById("optionsDetails");
+            if (optionsDetails) {
+                const isOpen = localStorage.getItem("optionsOpen") === "true";
+                if (isOpen) optionsDetails.open = true;
+                optionsDetails.addEventListener("toggle", () => {
+                    localStorage.setItem("optionsOpen", optionsDetails.open);
+                });
+            }
+
             currentLibraryId = null;
             switchLibraryTab('library');
             initPresets();
+            updateOptionsSummary();
+            updateLibraryHistoryVisibility();
         });
 
         function buildOptimizeRequestBody(rawPrompt, strength, targetModel) {
@@ -2789,6 +2936,7 @@ Generate a query for: {{user_query}}`,
             if (currentLibraryTab === "history") {
                 renderHistory();
             }
+            updateLibraryHistoryVisibility();
         }
 
         function clearHistory() {
@@ -2796,6 +2944,7 @@ Generate a query for: {{user_query}}`,
             if (currentLibraryTab === "history") {
                 renderHistory();
             }
+            updateLibraryHistoryVisibility();
         }
 
         function renderHistory() {
@@ -3077,6 +3226,7 @@ Generate a query for: {{user_query}}`,
                 currentLibraryId = null;
             }
             renderLibrary();
+            updateLibraryHistoryVisibility();
             showToast("Prompt deleted from library.");
         }
 
@@ -3226,6 +3376,7 @@ Generate a query for: {{user_query}}`,
             if (currentLibraryTab === "library") {
                 renderLibrary();
             }
+            updateLibraryHistoryVisibility();
         }
 
         function openExportModal() {
