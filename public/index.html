@@ -864,8 +864,6 @@
             font-size: 0.85rem;
             line-height: 1.55;
             white-space: pre-wrap;
-            max-height: 320px;
-            overflow-y: auto;
         }
 
         ins.diff-add {
@@ -1317,14 +1315,14 @@
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Original Prompt Response</span>
                         <button type="button" class="copy-btn" onclick="saveWinner('original')" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; min-height: 32px;"><span class="btn-icon">🏆</span> Save Winner</button>
                     </div>
-                    <div class="test-output" id="testBenchOriginalOutput" style="background: white; border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; min-height: 250px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.5; color: var(--text-primary);"></div>
+                    <div class="test-output" id="testBenchOriginalOutput" style="background: white; border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; min-height: 120px; white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.5; color: var(--text-primary);"></div>
                 </div>
                 <div class="test-column" style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 0.25rem;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Optimized Prompt Response</span>
                         <button type="button" class="copy-btn primary-action" onclick="saveWinner('optimized')" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; min-height: 32px;"><span class="btn-icon">🏆</span> Save Winner</button>
                     </div>
-                    <div class="test-output" id="testBenchOptimizedOutput" style="background: white; border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; min-height: 250px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.5; color: var(--text-primary);"></div>
+                    <div class="test-output" id="testBenchOptimizedOutput" style="background: white; border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; min-height: 120px; white-space: pre-wrap; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.5; color: var(--text-primary);"></div>
                 </div>
             </div>
         </div>
@@ -1910,7 +1908,7 @@ Generate a query for: {{user_query}}`,
                         }
                         const streamingTextEl = document.getElementById("streamingText");
                         streamingTextEl.textContent += data.text;
-                        outputBox.scrollTop = outputBox.scrollHeight;
+                        outputBox.scrollIntoView({ behavior: "auto", block: "end" });
                     } else if (event === "done") {
                         doneData = data;
                     } else if (event === "error") {
