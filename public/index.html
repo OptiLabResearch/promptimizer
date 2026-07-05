@@ -359,6 +359,113 @@
             transform: scale(1.02);
         }
 
+        /* Bottom-Sticky Action Bar */
+        .sticky-action-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid var(--card-border);
+            padding: 1rem 2.5rem;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 50;
+            box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.04);
+            border-bottom-left-radius: 24px;
+            border-bottom-right-radius: 24px;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 0.5rem;
+            background: white;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+            z-index: 100;
+            min-width: 210px;
+            overflow: hidden;
+            animation: slideUp 0.15s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .menu-item {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            background: none;
+            border: none;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .menu-item:hover {
+            background: rgba(139, 92, 246, 0.05);
+            color: var(--accent-purple);
+        }
+
+        .segmented-control {
+            display: flex;
+            background: rgba(15, 23, 42, 0.04);
+            padding: 0.2rem;
+            border-radius: 10px;
+            border: 1px solid var(--card-border);
+        }
+
+        .segment-btn {
+            background: none;
+            border: none;
+            padding: 0.4rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: auto;
+        }
+
+        .segment-btn.active {
+            background: white;
+            color: var(--accent-purple);
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--card-border);
+            color: var(--accent-purple);
+            box-shadow: none;
+        }
+
+        .btn-ghost:hover {
+            background: rgba(139, 92, 246, 0.05);
+            border-color: var(--accent-purple);
+            transform: translateY(-2px);
+        }
+
         .copy-btn.success {
             background: rgba(16, 185, 129, 0.15);
             border-color: var(--success-green);
@@ -1253,7 +1360,6 @@
                 <div class="context-title">Raw Prompt Template</div>
                 <div class="context-snippet" id="contextSnippet"></div>
             </div>
-            <div class="context-meta" id="contextMeta"></div>
             <button class="copy-btn" onclick="restoreInputState()"><span class="btn-icon">✏️</span> Edit Input</button>
         </div>
 
@@ -1359,20 +1465,14 @@
         </div>
 
         <!-- Output Panel -->
-        <div class="panel" id="resultPanel" style="display: none;">
-            <h2><span class="icon">🚀</span> Optimized Result</h2>
-
-            <div class="delta-bar" id="deltaBar" style="display: none;">
-                <div class="delta-chips" id="deltaChips"></div>
-                <button class="delta-toggle" id="deltaToggle" onclick="toggleDelta()" aria-expanded="false" aria-controls="explanationSection">
-                    <span class="chevron">▶</span> <span>Why this is better</span>
-                </button>
-            </div>
-
-            <!-- Placeholder Gating Banner -->
-            <div class="gate" id="gateBar">
-                <span class="dot"></span>
-                <span id="gateText"></span>
+        <!-- Output Panel -->
+        <div class="panel" id="resultPanel" style="display: none; padding-bottom: 5.5rem; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+                <h2 style="margin: 0;"><span class="icon">🚀</span> Optimized Result</h2>
+                <div class="segmented-control" id="viewSegmentedControl" style="display: none;">
+                    <button type="button" class="segment-btn active" id="segmentPromptBtn" onclick="switchResultView('prompt')">Prompt</button>
+                    <button type="button" class="segment-btn" id="segmentOutlineBtn" onclick="switchResultView('outline')">Outline</button>
+                </div>
             </div>
 
             <div class="output-container">
@@ -1384,30 +1484,39 @@
                 </div>
             </div>
 
-            <div class="explanation-section" id="explanationSection" style="display: none;">
-                <h2><span class="icon">💡</span> Enhancements Made</h2>
-                <div class="explanation-card" id="explanationText"></div>
-            </div>
-
-            <!-- Variable Sandbox Section -->
-            <div class="sandbox-section" id="sandboxSection" style="display: none;">
-                <h3><span class="icon">🧪</span> Variable Sandbox</h3>
-                <div class="sandbox-grid" id="sandboxGrid"></div>
-                <div class="sandbox-preview-wrapper">
-                    <button class="delta-toggle" id="sandboxPreviewToggle" onclick="toggleSandboxPreview()" aria-expanded="false" aria-controls="sandboxPreview">
-                        <span class="chevron">▶</span> <span>Show Compiled Preview</span>
-                    </button>
-                    <div class="sandbox-preview" id="sandboxPreview" style="display: none;"></div>
+            <!-- What Changed Footer Row -->
+            <div id="whatChangedFooter" style="margin-top: 1.25rem; font-size: 0.9rem; color: var(--text-secondary); display: none;">
+                <span onclick="toggleExplanationFooter()" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; color: var(--accent-purple); font-weight: 500; user-select: none;">
+                    <span id="whatChangedSummaryText">✨ Added enhancements</span> 
+                    <span id="whatChangedChevron" style="font-size: 0.75rem; transition: transform 0.2s; display: inline-block;">▼</span>
+                </span>
+                <div id="whatChangedDetails" style="display: none; margin-top: 0.75rem; padding: 1.25rem; background: rgba(139, 92, 246, 0.04); border: 1px solid rgba(139, 92, 246, 0.15); border-left: 4px solid var(--accent-purple); border-radius: 12px; font-size: 0.9rem; line-height: 1.6; color: var(--text-primary);">
                 </div>
             </div>
 
-            <div class="refine-section" id="refineSection" style="display: none;">
+            <div class="refine-section" id="refineSection" style="display: none; margin-top: 1.5rem;">
                 <div class="refine-row">
                     <input type="text" id="refineInput" placeholder="Refine further… (e.g. 'make it shorter', 'add a JSON output schema')" maxlength="2000">
                     <button class="copy-btn" id="refineBtn" onclick="applyRefinement()">
                         <span class="loader" id="refineLoader"></span>
                         <span id="refineBtnText">Refine</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Sticky bottom action bar -->
+            <div class="sticky-action-bar" id="stickyActionBar" style="display: none;">
+                <button type="button" class="btn primary-action copy-action" id="stickyCopyBtn" onclick="copyToClipboard()" style="min-width: 160px;"><span>📋</span> Copy prompt</button>
+                <button type="button" class="btn btn-ghost test-action" onclick="showTestSection()" style="flex-grow: 0; min-height: 44px; font-weight: 600; border-radius: 14px; padding: 0.85rem 1.5rem;">⚖️ Test it</button>
+                <div style="position: relative;">
+                    <button type="button" class="btn btn-ghost" id="overflowMenuBtn" onclick="toggleOverflowMenu(event)" style="padding: 0.5rem 0.85rem; font-size: 1rem; min-height: 44px; display: flex; align-items: center; justify-content: center; flex-grow: 0; border-radius: 14px;" title="More options">⋯</button>
+                    <div id="overflowMenu" class="dropdown-menu">
+                        <button type="button" onclick="triggerSaveFromMenu(event)" class="menu-item">💾 Save to library</button>
+                        <button type="button" onclick="triggerExportFromMenu(event)" class="menu-item">📥 Export prompt</button>
+                        <button type="button" id="overflowMenuDiffBtn" onclick="triggerDiffFromMenu(event)" class="menu-item">🔀 View diff</button>
+                        <button type="button" id="overflowMenuPreviewBtn" onclick="triggerPreviewFromMenu(event)" class="menu-item">🔍 Preview compiled prompt</button>
+                        <button type="button" onclick="triggerRefineFromMenu(event)" class="menu-item">✨ Refine prompt</button>
+                    </div>
                 </div>
             </div>
 
@@ -1961,12 +2070,6 @@ Generate a query for: {{user_query}}`,
 
             // Populate and show context bar
             document.getElementById("contextSnippet").innerText = rawPrompt;
-            const targetName = targetModel ? (targetModel.charAt(0).toUpperCase() + targetModel.slice(1)) : "Generic";
-            const lengthName = lengthSetting.charAt(0).toUpperCase() + lengthSetting.slice(1);
-            document.getElementById("contextMeta").innerHTML = `
-                <span class="context-meta-badge">${targetName}</span>
-                <span class="context-meta-badge">${lengthName}</span>
-            `;
 
             // Swap screens
             document.getElementById("inputPanel").style.display = "none";
@@ -2102,15 +2205,141 @@ Generate a query for: {{user_query}}`,
             document.getElementById("rawPrompt").focus();
         }
 
+        let activeResultView = "prompt";
+        let previewCompiledMode = false;
+
+        function switchResultView(view) {
+            activeResultView = view;
+            const promptView = document.getElementById("continuousPromptView");
+            const outlineView = document.getElementById("outlinePromptView");
+            const promptBtn = document.getElementById("segmentPromptBtn");
+            const outlineBtn = document.getElementById("segmentOutlineBtn");
+            
+            if (view === "prompt") {
+                if (promptView) promptView.style.display = "block";
+                if (outlineView) outlineView.style.display = "none";
+                if (promptBtn) promptBtn.classList.add("active");
+                if (outlineBtn) outlineBtn.classList.remove("active");
+            } else {
+                if (promptView) promptView.style.display = "none";
+                if (outlineView) outlineView.style.display = "flex";
+                if (promptBtn) promptBtn.classList.remove("active");
+                if (outlineBtn) outlineBtn.classList.add("active");
+            }
+        }
+
+        function onContinuousBlur(el) {
+            const rawText = getRawTextFromEditable(el);
+            currentOptimizedText = rawText;
+
+            // Update placeholders
+            const matches = currentOptimizedText.match(PLACEHOLDER_REGEX) || [];
+            const newPlaceholders = Array.from(new Set(matches));
+
+            currentPlaceholders = newPlaceholders;
+            const newValues = {};
+            currentPlaceholders.forEach(p => {
+                newValues[p] = placeholderValues[p] || "";
+            });
+            placeholderValues = newValues;
+
+            // Re-parse sections
+            currentSections = parseSections(currentOptimizedText);
+
+            // Sync continuous view HTML
+            el.innerHTML = renderPlaceholderChipsHtml(escapeHtml(rawText));
+
+            // Sync outline view HTML
+            const outlineView = document.getElementById("accordionContainer");
+            if (outlineView) {
+                outlineView.innerHTML = renderSectionsHtml();
+            }
+
+            updateGateStatus();
+            updateTokenEstimates();
+        }
+
+        function togglePreviewCompiled() {
+            previewCompiledMode = !previewCompiledMode;
+            
+            const btn = document.getElementById("overflowMenuPreviewBtn");
+            if (btn) {
+                btn.innerHTML = previewCompiledMode ? "✓ Preview compiled prompt" : "🔍 Preview compiled prompt";
+            }
+            
+            const promptView = document.getElementById("continuousPromptView");
+            if (promptView) {
+                promptView.innerHTML = renderPlaceholderChipsHtml(escapeHtml(currentOptimizedText));
+            }
+            
+            const outlineContainer = document.getElementById("accordionContainer");
+            if (outlineContainer) {
+                outlineContainer.innerHTML = renderSectionsHtml();
+            }
+        }
+
+        function toggleOverflowMenu(event) {
+            event.stopPropagation();
+            const menu = document.getElementById("overflowMenu");
+            if (!menu) return;
+            const isOpen = menu.style.display === "block";
+            menu.style.display = isOpen ? "none" : "block";
+        }
+
+        window.addEventListener("click", () => {
+            const menu = document.getElementById("overflowMenu");
+            if (menu) menu.style.display = "none";
+        });
+
+        function triggerSaveFromMenu(event) {
+            event.stopPropagation();
+            document.getElementById("overflowMenu").style.display = "none";
+            saveToLibrary();
+        }
+
+        function triggerExportFromMenu(event) {
+            event.stopPropagation();
+            document.getElementById("overflowMenu").style.display = "none";
+            openExportModal();
+        }
+
+        function triggerDiffFromMenu(event) {
+            event.stopPropagation();
+            document.getElementById("overflowMenu").style.display = "none";
+            toggleDiffView();
+        }
+
+        function triggerPreviewFromMenu(event) {
+            event.stopPropagation();
+            document.getElementById("overflowMenu").style.display = "none";
+            togglePreviewCompiled();
+        }
+
+        function triggerRefineFromMenu(event) {
+            event.stopPropagation();
+            document.getElementById("overflowMenu").style.display = "none";
+            const refineSec = document.getElementById("refineSection");
+            if (refineSec) {
+                const isHidden = refineSec.style.display === "none";
+                refineSec.style.display = isHidden ? "block" : "none";
+                if (isHidden) {
+                    document.getElementById("refineInput").focus();
+                }
+            }
+        }
+
         function renderOptimizedResult(optimizedText, explanationText, model, rawPromptForDiff) {
             const outputBox = document.getElementById("outputBox");
-            const expSection = document.getElementById("explanationSection");
             const refineSection = document.getElementById("refineSection");
             const testBenchPanel = document.getElementById("testBenchPanel");
 
             currentOptimizedText = optimizedText || "";
             currentRawPrompt = rawPromptForDiff !== undefined ? rawPromptForDiff : document.getElementById("rawPrompt").value;
             diffModeOn = false;
+            previewCompiledMode = false;
+
+            const previewMenuBtn = document.getElementById("overflowMenuPreviewBtn");
+            if (previewMenuBtn) previewMenuBtn.innerHTML = "🔍 Preview compiled prompt";
 
             // Extract unique placeholders
             const matches = currentOptimizedText.match(PLACEHOLDER_REGEX) || [];
@@ -2125,36 +2354,31 @@ Generate a query for: {{user_query}}`,
             currentSections = parseSections(currentOptimizedText);
             currentExplanationText = explanationText || "";
 
-            const warningHtml = `<span class="placeholder-warning" id="placeholderWarningInActions" style="display: none;"></span>`;
-
             outputBox.innerHTML = `
-                <div class="result-actions">
-                    ${warningHtml}
-                    <button class="copy-btn copy-action" onclick="copyToClipboard()"><span class="btn-icon">📋</span> Copy</button>
-                    <button class="copy-btn save-action" onclick="saveToLibrary()"><span class="btn-icon">💾</span> Save</button>
-                    <button class="copy-btn export-action" onclick="openExportModal()"><span class="btn-icon">📥</span> Export</button>
-                    <button class="copy-btn diff-action" onclick="toggleDiffView()"><span class="btn-icon">🔀</span> Diff</button>
-                    <button class="copy-btn primary-action test-action" onclick="showTestSection()"><span class="btn-icon">⚖️</span> Test Both</button>
+                <div id="continuousPromptView" style="font-family: var(--font-mono); font-size: 0.95rem; line-height: 1.65; white-space: pre-wrap; padding: 1.5rem; border-radius: 14px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.7); outline: none;" contenteditable="true" onblur="onContinuousBlur(this)">${renderPlaceholderChipsHtml(escapeHtml(currentOptimizedText))}</div>
+                <div id="outlinePromptView" style="display: none; flex-direction: column; gap: 1rem; width: 100%;">
+                    <div id="accordionContainer">
+                        ${renderSectionsHtml()}
+                    </div>
                 </div>
-                <div id="accordionContainer">
-                    ${renderSectionsHtml()}
-                </div>
-                <div class="result-stats" id="resultTokenEstimate" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 1rem; text-align: right;"></div>
-                <div class="explanation-card" id="explanationCardForGeneral" style="display: none; margin-top: 1rem; background: rgba(139, 92, 246, 0.04); border: 1px solid rgba(139, 92, 246, 0.15); border-left: 4px solid var(--accent-purple); border-radius: 12px; padding: 1rem; font-size: 0.85rem;"></div>
+                <div class="result-stats" id="resultTokenEstimate" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 1.25rem; text-align: right;"></div>
             `;
 
-            if (expSection) expSection.style.display = "none";
-            
-            const deltaBar = document.getElementById("deltaBar");
-            if (deltaBar) deltaBar.style.display = "none"; // Handled inline/general now
+            const viewToggle = document.getElementById("viewSegmentedControl");
+            if (viewToggle) viewToggle.style.display = currentOptimizedText ? "flex" : "none";
+
+            const stickyBar = document.getElementById("stickyActionBar");
+            if (stickyBar) stickyBar.style.display = currentOptimizedText ? "flex" : "none";
 
             updateGateStatus();
-            renderSandbox();
+            updateExplanationFooter();
             updateTokenEstimates();
 
             refineSection.style.display = currentOptimizedText ? "block" : "none";
             if (testBenchPanel) testBenchPanel.style.display = "none";
             document.getElementById("refineInput").value = "";
+            
+            switchResultView('prompt');
         }
 
         // ---- Section & Explanation Parsing ----
@@ -2371,51 +2595,103 @@ Generate a query for: {{user_query}}`,
             });
         }
 
+        let copyClickCount = 0;
+        let copyResetTimer = null;
+
         function updateGateStatus() {
             const unfilledTokens = currentPlaceholders.filter(token => !placeholderValues[token]);
             const unfilledCount = unfilledTokens.length;
 
-            const gateBar = document.getElementById("gateBar");
-            const gateText = document.getElementById("gateText");
-            const copyBtn = document.querySelector(".copy-action");
-            const warningHtml = document.getElementById("placeholderWarningInActions");
+            const copyBtn = document.getElementById("stickyCopyBtn");
+            if (!copyBtn) return;
 
-            if (unfilledCount === 0) {
-                if (gateBar) {
-                    gateBar.style.display = "flex";
-                    gateBar.className = "gate done";
-                    gateText.innerHTML = `<span class="dot"></span> All placeholders filled. The prompt is copy-ready.`;
-                }
-                if (copyBtn) copyBtn.removeAttribute("disabled");
-                if (warningHtml) warningHtml.style.display = "none";
+            copyBtn.removeAttribute("disabled");
+
+            if (unfilledCount > 0) {
+                copyBtn.innerHTML = `<span>📋</span> Copy (${unfilledCount} to fill)`;
             } else {
-                if (gateBar) {
-                    if (warningDismissed) {
-                        gateBar.style.display = "none";
-                    } else {
-                        gateBar.style.display = "flex";
-                        gateBar.className = "gate";
-                        gateText.innerHTML = `<span class="dot"></span> ${unfilledCount} placeholder${unfilledCount === 1 ? "" : "s"} need${unfilledCount === 1 ? "s" : ""} input. Click chips or <a href="#" onclick="dismissWarningAndEnableCopy(event)" class="gate-link">copy raw prompt anyway</a>.`;
-                    }
-                }
-                if (warningDismissed) {
-                    if (copyBtn) copyBtn.removeAttribute("disabled");
-                    if (warningHtml) warningHtml.style.display = "none";
-                } else {
-                    if (copyBtn) copyBtn.setAttribute("disabled", "true");
-                    if (warningHtml) {
-                        warningHtml.style.display = "inline-block";
-                        warningHtml.innerText = `⚠ ${unfilledCount} unfilled`;
-                    }
-                }
+                copyBtn.innerHTML = `<span>📋</span> Copy prompt`;
             }
         }
 
         function dismissWarningAndEnableCopy(event) {
-            if (event) event.preventDefault();
-            warningDismissed = true;
-            updateGateStatus();
-            showToast("Warning bypassed. You can now copy the raw template.");
+            // Deprecated/no-op
+        }
+
+        function updateExplanationFooter() {
+            const footer = document.getElementById("whatChangedFooter");
+            const details = document.getElementById("whatChangedDetails");
+            const summaryText = document.getElementById("whatChangedSummaryText");
+            if (!footer || !details || !summaryText) return;
+
+            const { sectionExplanations, generalExplanations } = parseExplanations(currentExplanationText);
+            
+            const categories = [];
+            let totalBullets = 0;
+            
+            Object.entries(sectionExplanations).forEach(([sec, bullets]) => {
+                if (bullets.length > 0) {
+                    const cleanSec = sec.trim().toLowerCase();
+                    categories.push(cleanSec);
+                    totalBullets += bullets.length;
+                }
+            });
+            
+            if (generalExplanations.length > 0) {
+                categories.push("general");
+                totalBullets += generalExplanations.length;
+            }
+            
+            if (totalBullets === 0) {
+                footer.style.display = "none";
+                return;
+            }
+            
+            footer.style.display = "block";
+            
+            const categoryLabels = categories.map(cat => {
+                if (cat === "role") return "role";
+                if (cat === "context") return "context";
+                if (cat === "task") return "task";
+                if (cat === "constraints") return "constraints";
+                if (cat === "output format") return "output format";
+                return "general enhancements";
+            });
+            
+            let label = "✨ Enhanced: " + categoryLabels.join(", ");
+            summaryText.innerText = label + " — see details";
+            
+            let detailsHtml = "";
+            Object.entries(sectionExplanations).forEach(([sec, bullets]) => {
+                if (bullets.length > 0) {
+                    const displaySec = sec.charAt(0).toUpperCase() + sec.slice(1);
+                    detailsHtml += `<div style="margin-bottom: 0.75rem;"><strong>${escapeHtml(displaySec)}:</strong>`;
+                    detailsHtml += `<ul style="padding-left: 1.25rem; margin-top: 0.25rem; margin-bottom: 0;">`;
+                    detailsHtml += bullets.map(b => `<li>${escapeHtml(b)}</li>`).join("");
+                    detailsHtml += `</ul></div>`;
+                }
+            });
+            if (generalExplanations.length > 0) {
+                detailsHtml += `<div style="margin-bottom: 0.75rem;"><strong>General Enhancements:</strong>`;
+                detailsHtml += `<ul style="padding-left: 1.25rem; margin-top: 0.25rem; margin-bottom: 0;">`;
+                detailsHtml += generalExplanations.map(b => `<li>${formatExplanation(b)}</li>`).join("");
+                detailsHtml += `</ul></div>`;
+            }
+            
+            details.innerHTML = detailsHtml;
+        }
+
+        function toggleExplanationFooter() {
+            const details = document.getElementById("whatChangedDetails");
+            const chevron = document.getElementById("whatChangedChevron");
+            if (!details || !chevron) return;
+            if (details.style.display === "none") {
+                details.style.display = "block";
+                chevron.style.transform = "rotate(180deg)";
+            } else {
+                details.style.display = "none";
+                chevron.style.transform = "rotate(0deg)";
+            }
         }
 
         function compilePrompt() {
@@ -2996,12 +3272,6 @@ Generate a query for: {{user_query}}`,
             document.getElementById("resultPanel").style.display = "flex";
             
             document.getElementById("contextSnippet").innerText = entry.raw || "";
-            const targetName = entry.targetModel ? (entry.targetModel.charAt(0).toUpperCase() + entry.targetModel.slice(1)) : "Generic";
-            const lengthName = (entry.length || "standard").charAt(0).toUpperCase() + (entry.length || "standard").slice(1);
-            document.getElementById("contextMeta").innerHTML = `
-                <span class="context-meta-badge">${targetName}</span>
-                <span class="context-meta-badge">${lengthName}</span>
-            `;
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
 
@@ -3262,12 +3532,6 @@ Generate a query for: {{user_query}}`,
             document.getElementById("resultPanel").style.display = "flex";
             
             document.getElementById("contextSnippet").innerText = version.raw || "";
-            const targetName = version.targetModel ? (version.targetModel.charAt(0).toUpperCase() + version.targetModel.slice(1)) : "Generic";
-            const lengthName = (version.length || "standard").charAt(0).toUpperCase() + (version.length || "standard").slice(1);
-            document.getElementById("contextMeta").innerHTML = `
-                <span class="context-meta-badge">${targetName}</span>
-                <span class="context-meta-badge">${lengthName}</span>
-            `;
             window.scrollTo({ top: 0, behavior: "smooth" });
             showToast(`Loaded "${item.name}" (v${versionIdx + 1})`);
         }
@@ -3455,15 +3719,49 @@ Generate a query for: {{user_query}}`,
         }
 
         function copyToClipboard() {
+            const unfilledTokens = currentPlaceholders.filter(token => !placeholderValues[token]);
+            const unfilledCount = unfilledTokens.length;
+
+            if (unfilledCount > 0 && copyClickCount === 0) {
+                const firstUnfilled = document.querySelector(".placeholder-chip:not(.filled)");
+                if (firstUnfilled) {
+                    firstUnfilled.scrollIntoView({ behavior: "smooth", block: "center" });
+                    firstUnfilled.style.outline = "3px solid var(--accent-pink)";
+                    setTimeout(() => { firstUnfilled.style.outline = ""; }, 1500);
+                    setTimeout(() => {
+                        activatePlaceholder(new Event('click'), firstUnfilled);
+                    }, 100);
+                }
+                
+                showToast("Click Copy again to copy with unfilled placeholders.");
+                copyClickCount = 1;
+                clearTimeout(copyResetTimer);
+                copyResetTimer = setTimeout(() => {
+                    copyClickCount = 0;
+                    updateGateStatus();
+                }, 4000);
+                
+                const copyBtn = document.getElementById("stickyCopyBtn");
+                if (copyBtn) {
+                    copyBtn.innerHTML = `<span>📋</span> Copy anyway`;
+                }
+                return;
+            }
+
             const text = compilePrompt();
             navigator.clipboard.writeText(text).then(() => {
-                const copyBtn = document.querySelector(".copy-action");
-                copyBtn.innerHTML = "<span>✓</span> Copied!";
-                copyBtn.classList.add("success");
-                setTimeout(() => {
-                    copyBtn.innerHTML = "<span>📋</span> Copy";
-                    copyBtn.classList.remove("success");
-                }, 2000);
+                const copyBtn = document.getElementById("stickyCopyBtn");
+                if (copyBtn) {
+                    copyBtn.innerHTML = "<span>✓</span> Copied!";
+                    copyBtn.classList.add("success");
+                    setTimeout(() => {
+                        copyBtn.classList.remove("success");
+                        copyClickCount = 0;
+                        updateGateStatus();
+                    }, 2000);
+                }
+                clearTimeout(copyResetTimer);
+                copyClickCount = 0;
             }).catch(err => {
                 console.error("Copy failed", err);
                 showToast("Failed to copy to clipboard.", true);
