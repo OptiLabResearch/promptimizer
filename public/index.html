@@ -992,58 +992,7 @@
             gap: 2rem;
         }
 
-        .context-bar {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 1rem 1.5rem;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1.5rem;
-            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
 
-        .context-info {
-            flex-grow: 1;
-            min-width: 0;
-        }
-
-        .context-title {
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            margin-bottom: 0.25rem;
-        }
-
-        .context-snippet {
-            font-family: monospace;
-            font-size: 0.85rem;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .context-meta {
-            display: flex;
-            gap: 0.5rem;
-            flex-shrink: 0;
-        }
-
-        .context-meta-badge {
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.25rem 0.65rem;
-            border-radius: 20px;
-            background: rgba(139, 92, 246, 0.06);
-            color: var(--accent-purple);
-            border: 1px solid rgba(139, 92, 246, 0.1);
-        }
 
 
 
@@ -1203,14 +1152,7 @@
     </header>
 
     <div class="container">
-        <!-- Input Context Bar (Summary) -->
-        <div id="inputContextBar" class="context-bar" style="display: none;">
-            <div class="context-info">
-                <div class="context-title">Raw Prompt Template</div>
-                <div class="context-snippet" id="contextSnippet"></div>
-            </div>
-            <button class="copy-btn" onclick="restoreInputState()"><span class="btn-icon">✏️</span> Edit Input</button>
-        </div>
+
 
         <!-- Input Panel -->
         <div class="panel" id="inputPanel">
@@ -1351,6 +1293,10 @@
                         <span id="refineBtnText">Refine</span>
                     </button>
                 </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 1.25rem;">
+                <button type="button" class="copy-btn" style="margin: 0 auto; display: inline-flex;" onclick="restoreInputState()">↑ Optimize another prompt</button>
             </div>
 
             <!-- Sticky bottom action bar -->
@@ -1958,16 +1904,11 @@ Generate a query for: {{user_query}}`,
             }
             promptErrorEl.classList.remove("show");
 
-            // Populate and show context bar
-            document.getElementById("contextSnippet").innerText = rawPrompt;
-
-            // Swap screens
-            document.getElementById("inputPanel").style.display = "none";
-            document.getElementById("inputContextBar").style.display = "flex";
-            document.getElementById("resultPanel").style.display = "flex";
-
-            // Scroll to top
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            // Linear flow: result appears below the input, input stays visible
+            document.getElementById("testBenchPanel").style.display = "none";
+            const resultPanelEl = document.getElementById("resultPanel");
+            resultPanelEl.style.display = "flex";
+            resultPanelEl.scrollIntoView({ behavior: "smooth", block: "start" });
 
             btn.disabled = true;
             btnText.innerText = "Optimizing...";
@@ -2088,11 +2029,11 @@ Generate a query for: {{user_query}}`,
         let currentLibraryTab = "library";
 
         function restoreInputState() {
-            document.getElementById("inputPanel").style.display = "flex";
-            document.getElementById("inputContextBar").style.display = "none";
-            document.getElementById("resultPanel").style.display = "none";
-            document.getElementById("inputPanel").scrollIntoView({ behavior: "smooth", block: "start" });
-            document.getElementById("rawPrompt").focus();
+            // Linear flow: input is always visible — just take the user there.
+            const inputPanel = document.getElementById("inputPanel");
+            inputPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+            const raw = document.getElementById("rawPrompt");
+            if (raw) raw.focus();
         }
 
         let activeResultView = "prompt";
@@ -3111,13 +3052,10 @@ Generate a query for: {{user_query}}`,
             setChipGroupValue("qualityChips", entry.depth || "standard");
             renderOptimizedResult(entry.optimized || "", entry.explanation || "", entry.model, entry.raw || "");
 
-            // Transition to result state in single-column layout
-            document.getElementById("inputPanel").style.display = "none";
-            document.getElementById("inputContextBar").style.display = "flex";
-            document.getElementById("resultPanel").style.display = "flex";
-            
-            document.getElementById("contextSnippet").innerText = entry.raw || "";
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            document.getElementById("testBenchPanel").style.display = "none";
+            const resultPanelEl = document.getElementById("resultPanel");
+            resultPanelEl.style.display = "flex";
+            resultPanelEl.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
         let selectedVersions = {}; // Map of itemId -> versionIndex
@@ -3371,13 +3309,10 @@ Generate a query for: {{user_query}}`,
             
             renderOptimizedResult(version.optimized || "", version.explanation || "", version.model, version.raw || "");
 
-            // Transition to result state in single-column layout
-            document.getElementById("inputPanel").style.display = "none";
-            document.getElementById("inputContextBar").style.display = "flex";
-            document.getElementById("resultPanel").style.display = "flex";
-            
-            document.getElementById("contextSnippet").innerText = version.raw || "";
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            document.getElementById("testBenchPanel").style.display = "none";
+            const resultPanelEl = document.getElementById("resultPanel");
+            resultPanelEl.style.display = "flex";
+            resultPanelEl.scrollIntoView({ behavior: "smooth", block: "start" });
             showToast(`Loaded "${item.name}" (v${versionIdx + 1})`);
         }
 
