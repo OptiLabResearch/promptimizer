@@ -19,6 +19,9 @@ export async function onRequestPost({ request, env }) {
   if (rawPrompt.length > 30000) {
     return json({ ok: false, error: "Prompt too long (max 30,000 characters)" }, 400);
   }
+  if (body.depth === "deep") {
+    return json({ ok: false, error: "Deep mode is not supported on the streaming endpoint." }, 400);
+  }
 
   let systemPrompt, userText, config;
   try {

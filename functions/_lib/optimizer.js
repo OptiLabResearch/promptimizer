@@ -7,19 +7,25 @@ export const PROVIDER_PRESETS = {
     label: "OpenRouter",
     mode: "chat",
     baseUrl: "https://openrouter.ai/api/v1",
-    defaultModel: "deepseek/deepseek-chat-v3.1:free",
+    defaultModel: "nvidia/nemotron-3-ultra-550b-a55b:free",
   },
   nvidia: {
     label: "NVIDIA NIM",
     mode: "chat",
     baseUrl: "https://integrate.api.nvidia.com/v1",
-    defaultModel: "nvidia/nemotron-3-super-120b-a12b",
+    defaultModel: "minimaxai/minimax-m3",
+  },
+  google: {
+    label: "Google Gemini",
+    mode: "chat",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    defaultModel: "gemini-3-5-flash",
   },
   openai: {
     label: "OpenAI",
     mode: "chat",
     baseUrl: "https://api.openai.com/v1",
-    defaultModel: "gpt-4o-mini",
+    defaultModel: "gpt-5-4-mini",
   },
   anthropic: {
     label: "Anthropic",
@@ -37,24 +43,37 @@ export const PROVIDER_PRESETS = {
 
 const TARGET_MODEL_GUIDELINES = {
   claude:
-    "Target model: Anthropic Claude. Structure the prompt with XML tags " +
-    "(e.g. <context>, <instructions>, <constraints>) since Claude follows " +
-    "tag-delimited sections especially well.",
+    "Target model: Anthropic Claude. XML tags as the native delimiter dialect " +
+    "(<task>, <rules>, <document>, <example>); long documents at top in <document> " +
+    "wrappers, query/instructions at bottom; do NOT rely on assistant-prefill tricks " +
+    "(deprecated); role via system prompt is a strong lever; note newer Claude models " +
+    "are concise by default — ask for summaries explicitly if visibility is wanted. " +
+    "If the target is a modern reasoning model, do not add 'think step by step' — " +
+    "reasoning is controlled by a budget parameter, not prompt text.",
   gpt:
-    "Target model: OpenAI GPT. Structure the prompt with markdown headers " +
-    "(##) and numbered/bulleted lists rather than XML tags.",
+    "Target model: OpenAI GPT. Structure the prompt with markdown headers and lists " +
+    "rather than XML tags; outcome-first is official doctrine; GPT-5.x follows " +
+    "instructions literally — be specific, define stopping rules; keep personality/tone " +
+    "separate from decision rules; mention verbosity/output-contract blocks. " +
+    "If the target is a modern reasoning model, do not add 'think step by step' — " +
+    "reasoning is controlled by a budget parameter, not prompt text.",
   gemini:
-    "Target model: Google Gemini. Use explicit, numbered step-by-step " +
-    "instructions and be very literal/unambiguous about the task.",
+    "Target model: Google Gemini. Clear sectioning (markdown or XML both fine); for " +
+    "long-context, data first and query last; don't hand-write CoT — thinking budget is " +
+    "a parameter. If the target is a modern reasoning model, do not add 'think step by step' — " +
+    "reasoning is controlled by a budget parameter, not prompt text.",
   local:
-    "Target model: a small local/open-weight model. Keep the prompt short, " +
-    "simple, and direct — avoid deeply nested structure, long context, or " +
-    "many simultaneous constraints, since small models follow simple " +
-    "instructions far more reliably than complex ones.",
+    "Target model: a small local/open-weight model. Keep the prompt short, simple, and direct — " +
+    "avoid deeply nested structure, long context, or many simultaneous constraints, since small " +
+    "models follow simple instructions far more reliably than complex ones. Manual chain-of-thought " +
+    "(\"reason step by step before answering\") IS still useful here since small non-reasoning models " +
+    "benefit from it. If the target is a modern reasoning model, do not add 'think step by step' — " +
+    "reasoning is controlled by a budget parameter, not prompt text.",
   generic:
-    "Target model: unspecified/generic. Use widely-compatible structure " +
-    "(clear headers, short paragraphs) that works reasonably well across " +
-    "most LLMs.",
+    "Target model: unspecified/generic. Portable architecture (role, context, ordered rules or " +
+    "outcome definition, output schema, examples) with widely-compatible markdown structure; " +
+    "note the delimiter dialect can be swapped per provider. If the target is a modern reasoning " +
+    "model, do not add 'think step by step' — reasoning is controlled by a budget parameter, not prompt text.",
 };
 
 const STRENGTH_GUIDELINES = {
@@ -72,10 +91,10 @@ const LENGTH_GUIDELINES = {
 };
 
 const TECHNIQUE_GUIDELINES = {
-  cot: "Instruct the model to reason step-by-step (chain-of-thought) before giving its final answer.",
-  fewshot: "Include 1-3 well-chosen few-shot examples that demonstrate the desired input/output pattern.",
-  xml: "Structure the prompt's sections with XML tags (e.g. <context>, <task>, <constraints>) for clarity.",
-  placeholders: "Use variable placeholders in the form {{like_this}} for values that should be filled in dynamically.",
+  cot: "", // Handled dynamically in buildOptimizePrompt based on targetModel
+  fewshot: "Include 2–3 curated, contrastive examples that cover edge cases, including one near-miss negative example annotated with why it's wrong. Examples must be consistent with every stated rule — examples override instructions when they conflict.",
+  xml: "Structure the prompt's sections with XML tags (e.g. <context>, <task>, <constraints>) for clarity, using XML as the delimiter dialect regardless of target-model default.",
+  placeholders: "Use variable placeholders in the form {{like_this}} for values that should be filled in dynamically, putting input-data placeholders where the data belongs (long reference at top, query at bottom).",
 };
 
 export class ValidationError extends Error {}
@@ -92,7 +111,10 @@ export function buildOptimizePrompt(body, rawPrompt) {
     const systemPrompt =
       "You are an expert Prompt Engineer. The user has an already-optimized prompt and wants a " +
       "targeted revision, not a from-scratch rewrite. Apply ONLY the requested change while " +
-      "preserving everything else about the prompt's structure, persona, and intent.\n\n" +
+      "preserving everything else about the prompt's structure, persona, and intent. " +
+      "When applying the revision, keep the prompt aligned with modern best practice " +
+      "(outcome-first, delimited data, output contract); do not reintroduce step-by-step " +
+      "micromanagement or 'think step by step' boilerplate.\n\n" +
       "You MUST structure your entire response as exactly these two blocks, in this order,\n" +
       "with no text before, between, or after them:\n\n" +
       "<optimized_prompt>\n" +
@@ -112,16 +134,20 @@ export function buildOptimizePrompt(body, rawPrompt) {
   if (mode === "critique") {
     const systemPrompt =
       "You are an expert Prompt Engineer conducting a critique of a prompt — you do NOT rewrite it.\n" +
-      "Score the user's raw prompt from 1-10 on each of: Clarity, Specificity, Structure, and Completeness.\n" +
-      "Then list the concrete weaknesses you found and actionable suggestions for improving them.\n\n" +
+      "Evaluate the user's raw prompt through these four guide-aligned axes, scoring each from 1-10:\n" +
+      "1. Outcome clarity (Is 'done' defined? Are success criteria, hard constraints, and output shape specified outcome-first?)\n" +
+      "2. Structure & delimiting (Is there clear separation of data vs instructions? Is reference material at the top and the query at the bottom?)\n" +
+      "3. Output contract (Is there an enforceable format, explicit schema, template, or strict length limits?)\n" +
+      "4. Robustness (Are there anti-hallucination outs, explicit enums for classifications, and conditional decision rules over absolutes?)\n\n" +
+      "Evaluate through each lens separately. At the end of the evaluation, list the top 3 highest-impact fixes, ordered by expected gain.\n\n" +
       "You MUST structure your entire response as exactly these two blocks, in this order,\n" +
       "with no text before, between, or after them:\n\n" +
       "<optimized_prompt>\n" +
       "Repeat the user's raw prompt here, verbatim and unchanged.\n" +
       "</optimized_prompt>\n" +
       "<explanation>\n" +
-      "A markdown response with the four scores (out of 10) followed by a bullet-point list of weaknesses " +
-      "and suggestions. Do not include a rewritten prompt here.\n" +
+      "A markdown response with the four scores (out of 10) followed by the detailed evaluation through each lens, " +
+      "and ending with the top 3 highest-impact fixes ordered by expected gain. Do not include a rewritten prompt here.\n" +
       "</explanation>";
     return { systemPrompt, userText: `Raw Prompt to Optimize:\n${rawPrompt}` };
   }
@@ -129,22 +155,46 @@ export function buildOptimizePrompt(body, rawPrompt) {
   const strength = String(body.strength || "balanced").trim().toLowerCase();
   const guideline = STRENGTH_GUIDELINES[strength] || STRENGTH_GUIDELINES.balanced;
 
+  const targetModel = String(body.target_model || "").trim().toLowerCase();
   const requestedTechniques = Array.isArray(body.techniques) ? body.techniques : [];
   const techniqueLines = [];
   for (const t of requestedTechniques) {
-    const line = TECHNIQUE_GUIDELINES[String(t).trim().toLowerCase()];
-    if (line && !techniqueLines.includes(line)) techniqueLines.push(line);
+    const techKey = String(t).trim().toLowerCase();
+    if (techKey === "cot") {
+      const line = targetModel === "local"
+        ? "Add explicit step-by-step reasoning instructions (chain-of-thought) before giving the final answer."
+        : "For modern reasoning models, note that reasoning effort should be set via the API's reasoning/thinking parameter rather than using 'think step by step' prompt text.";
+      if (!techniqueLines.includes(line)) techniqueLines.push(line);
+    } else {
+      const line = TECHNIQUE_GUIDELINES[techKey];
+      if (line && !techniqueLines.includes(line)) techniqueLines.push(line);
+    }
   }
 
   let systemPrompt =
-    "You are an expert Prompt Engineer specializing in optimizing prompts for LLMs (such as Claude, GPT-4, and Gemini).\n" +
-    "Your task is to take the user's raw prompt and rewrite it to make it highly effective, structured, and clear.\n\n" +
-    "Structure your optimization around these principles:\n" +
-    "1. Persona: Assign a clear role/expert identity to the LLM.\n" +
-    "2. Context & Task: Clearly outline the background and the core objective.\n" +
-    "3. Instructions: Provide step-by-step instructions or steps to follow.\n" +
-    "4. Constraints: Define what the model should NOT do, style criteria, or limitations.\n" +
-    "5. Output Format: Specify the structural or syntax format (Markdown, JSON, list, etc.) of the response.\n\n" +
+    "You are an expert prompt engineer (2026 practice). Rewrite the user's raw prompt into a\n" +
+    "highly effective prompt. Apply these principles:\n\n" +
+    "1. OUTCOME-FIRST: Define what \"done\" looks like — the expected outcome, success criteria,\n" +
+    "   hard constraints, and output shape. Do NOT prescribe step-by-step procedures unless the\n" +
+    "   raw prompt shows the exact path itself matters (compliance, fixed pipelines).\n" +
+    "2. STRUCTURED ANATOMY, in this order when sections are warranted:\n" +
+    "   role/identity → tone rules → reference material (delimited & labeled) → task/outcome\n" +
+    "   definition → hard rules → examples → output format contract → the input/query LAST.\n" +
+    "   Only include sections that earn their place; do not pad with empty boilerplate sections.\n" +
+    "3. DELIMIT DATA FROM INSTRUCTIONS: any user-supplied data, documents, or variable content\n" +
+    "   goes in clearly delimited blocks. Long reference material at the top; the query and\n" +
+    "   instructions at the bottom.\n" +
+    "4. OUTPUT CONTRACT, not polite requests: exact format spec (schema, template, or explicit\n" +
+    "   length limits like \"≤5 bullets\"). Prefer machine-checkable shapes.\n" +
+    "5. DECISION RULES OVER ABSOLUTES: reserve ALWAYS/NEVER/MUST for true invariants; use\n" +
+    "   \"If X then Y, otherwise Z\" conditional rules for judgment calls.\n" +
+    "6. ANTI-HALLUCINATION: when the task involves extraction, facts, or classification, give\n" +
+    "   the model an out (\"if absent, output null / say 'insufficient information' — never\n" +
+    "   guess\") and constrain categorical outputs to explicit enums.\n" +
+    "7. HIGH SIGNAL ONLY: aim for the smallest set of high-signal tokens that achieves the\n" +
+    "   outcome. Cut filler like \"please\", \"world-class\", and restated obvious context.\n" +
+    "8. PLACEHOLDERS: if the prompt will be reused with varying inputs, mark those spots as\n" +
+    "   {{VARIABLES}} and put them where the data belongs (bottom for queries).\n\n" +
     `Optimization Requirement: ${guideline}\n`;
 
   if (techniqueLines.length) {
@@ -156,7 +206,6 @@ export function buildOptimizePrompt(body, rawPrompt) {
   const lengthGuideline = LENGTH_GUIDELINES[length] || LENGTH_GUIDELINES.standard;
   systemPrompt += `\nOutput length: ${lengthGuideline}\n`;
 
-  const targetModel = String(body.target_model || "").trim().toLowerCase();
   const targetGuideline = TARGET_MODEL_GUIDELINES[targetModel];
   if (targetGuideline) systemPrompt += `\n${targetGuideline}\n`;
 
@@ -171,6 +220,28 @@ export function buildOptimizePrompt(body, rawPrompt) {
     "</explanation>";
 
   return { systemPrompt, userText: `Raw Prompt to Optimize:\n${rawPrompt}` };
+}
+
+export function buildRefinePassPrompt(rawPrompt, firstOptimized) {
+  const systemPrompt =
+    "You are an expert prompt engineer. Critique the following optimized prompt through two lenses:\n" +
+    "1. Robustness and failure modes (hallucination outs, ambiguity, conflicting rules)\n" +
+    "2. Signal density and structure (placement, output contract)\n\n" +
+    "Then, output the improved final version in the same two-block format.\n\n" +
+    "You MUST structure your entire response as exactly these two blocks, in this order,\n" +
+    "with no text before, between, or after them:\n\n" +
+    "<optimized_prompt>\n" +
+    "The improved final prompt in markdown format.\n" +
+    "</optimized_prompt>\n" +
+    "<explanation>\n" +
+    "A short markdown bullet-point list of what you improved from the first version and why.\n" +
+    "</explanation>";
+
+  const userText =
+    `Original raw prompt:\n${rawPrompt}\n\n` +
+    `First-pass optimized prompt:\n${firstOptimized}`;
+
+  return { systemPrompt, userText };
 }
 
 export function parseDelimitedResponse(rawResponse) {
@@ -253,7 +324,14 @@ export function resolveProviderConfig(body, env) {
   sharedProviders.forEach((provider, i) => {
     const preset = PROVIDER_PRESETS[provider];
     if (!preset) return;
-    const key = provider === "nvidia" ? env.NVIDIA_API_KEY : provider === "openrouter" ? env.OPENROUTER_API_KEY : undefined;
+    const key =
+      provider === "nvidia"
+        ? env.NVIDIA_API_KEY
+        : provider === "openrouter"
+          ? env.OPENROUTER_API_KEY
+          : provider === "google"
+            ? env.GOOGLE_API_KEY
+            : undefined;
     if (!key) return;
     const rawModels = env[`HOSTED_MODEL_${provider.toUpperCase()}`] || (i === 0 ? env.HOSTED_MODEL : "");
     const models = String(rawModels || "")

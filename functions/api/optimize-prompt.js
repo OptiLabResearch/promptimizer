@@ -1,6 +1,7 @@
 import {
   ValidationError,
   buildOptimizePrompt,
+  buildRefinePassPrompt,
   parseDelimitedResponse,
   resolveProviderConfig,
   callCompletion,
@@ -30,14 +31,30 @@ export async function onRequestPost({ request, env }) {
   }
 
   try {
-    const { content, truncated, model } = await callCompletion(config, systemPrompt, userText);
+    let { content, truncated, model } = await callCompletion(config, systemPrompt, userText);
     if (truncated) {
       return json(
         { ok: false, error: "The model's response was cut off before it finished. Try a shorter prompt or a different model." },
         502
       );
     }
-    const { optimizedText, explanationText } = parseDelimitedResponse(content);
+    let { optimizedText, explanationText } = parseDelimitedResponse(content);
+
+    if (body.depth === "deep") {
+      const refineParams = buildRefinePassPrompt(rawPrompt, optimizedText);
+      const secondResult = await callCompletion(config, refineParams.systemPrompt, refineParams.userText);
+      if (secondResult.truncated) {
+        return json(
+          { ok: false, error: "The model's response was cut off during the second critique pass. Try a shorter prompt or a different model." },
+          502
+        );
+      }
+      const secondParsed = parseDelimitedResponse(secondResult.content);
+      optimizedText = secondParsed.optimizedText;
+      explanationText = secondParsed.explanationText;
+      model = secondResult.model;
+    }
+
     return json({ ok: true, optimized_prompt: optimizedText, explanation: explanationText, model });
   } catch (e) {
     return json({ ok: false, error: e.message || "Optimization failed." }, 500);

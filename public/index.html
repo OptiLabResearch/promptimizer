@@ -900,10 +900,10 @@
             <div class="field-error" id="promptError">Please enter a prompt to optimize.</div>
 
             <div class="technique-row">
-                <label class="technique-option" title="Instructs the AI to reason step-by-step before giving its final answer."><input type="checkbox" class="technique-checkbox" value="cot"> Chain-of-thought</label>
-                <label class="technique-option" title="Instructs the AI to include example input/output pairs in the optimized prompt."><input type="checkbox" class="technique-checkbox" value="fewshot"> Few-shot examples</label>
-                <label class="technique-option" title="Structures the prompt's sections with XML tags (e.g. <context>, <task>) for clearer parsing."><input type="checkbox" class="technique-checkbox" value="xml"> XML structure</label>
-                <label class="technique-option" title="Adds {{variable}} placeholders for values you'll fill in before using the prompt."><input type="checkbox" class="technique-checkbox" value="placeholders"> Variable placeholders</label>
+                <label class="technique-option" title="Only helps on small non-reasoning models; on reasoning models we recommend a thinking-budget note instead."><input type="checkbox" class="technique-checkbox" value="cot"> Chain-of-thought</label>
+                <label class="technique-option" title="Include 2-3 curated contrastive examples (including a near-miss negative) consistent with all stated rules."><input type="checkbox" class="technique-checkbox" value="fewshot"> Few-shot examples</label>
+                <label class="technique-option" title="Use XML tags as the delimiter dialect regardless of target model default."><input type="checkbox" class="technique-checkbox" value="xml"> XML structure</label>
+                <label class="technique-option" title="Use variable placeholders like {{like_this}}, placing input data at the bottom and reference materials at the top."><input type="checkbox" class="technique-checkbox" value="placeholders"> Variable placeholders</label>
             </div>
 
             <div class="control-row">
@@ -916,6 +916,15 @@
                 <input type="hidden" id="length" value="standard">
             </div>
             <div class="field-hint" id="lengthHint">Standard: proportionate length — expands only what clarity requires.</div>
+
+            <div class="control-row">
+                <span class="control-row-label">Quality:</span>
+                <div class="chip-group" id="qualityChips" title="Deep runs a second self-critique pass — better prompts, ~2x latency/cost.">
+                    <button type="button" class="chip selected" data-value="standard" onclick="selectChip('qualityChips', this)">Standard</button>
+                    <button type="button" class="chip" data-value="deep" onclick="selectChip('qualityChips', this)">Deep (2-pass)</button>
+                </div>
+                <input type="hidden" id="depth" value="standard">
+            </div>
 
             <div class="control-row">
                 <span class="control-row-label">Optimize for:</span>
@@ -1146,7 +1155,7 @@
             balanced: "Strikes an even balance between conciseness, clarity, and contextual detail.",
             concise: "Favors a tight, direct structure — trims anything not essential to the task.",
             detailed: "Expands with thorough context, edge cases, and explicit constraints.",
-            critique: "Doesn't rewrite the prompt — scores it and lists concrete weaknesses instead.",
+            critique: "Doesn't rewrite the prompt — scores it on Outcome Clarity, Structure, Output Contract, and Robustness.",
         };
 
         function updateStrengthHint() {
@@ -1164,6 +1173,8 @@
                 document.getElementById("lengthHint").innerText = LENGTH_HINTS[value] || LENGTH_HINTS.standard;
             } else if (groupId === "targetChips") {
                 document.getElementById("targetModel").value = value;
+            } else if (groupId === "qualityChips") {
+                document.getElementById("depth").value = value;
             }
         }
 
@@ -1203,6 +1214,7 @@
                 const techniques = Array.from(document.querySelectorAll(".technique-checkbox:checked")).map(cb => cb.value);
                 if (techniques.length) requestBody.techniques = techniques;
                 requestBody.length = document.getElementById("length").value || "standard";
+                requestBody.depth = document.getElementById("depth").value || "standard";
             }
             if (targetModel) requestBody.target_model = targetModel;
             return requestBody;
@@ -1259,6 +1271,9 @@
             const streamingTextEl = document.getElementById("streamingText");
 
             try {
+                if (requestBody.depth === "deep") {
+                    throw new Error("stream_unavailable");
+                }
                 const response = await fetch("/api/optimize-prompt/stream", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1297,6 +1312,7 @@
                     strength: strength,
                     targetModel: targetModel,
                     length: requestBody.length,
+                    depth: requestBody.depth || "standard",
                     model: doneData.model,
                     timestamp: Date.now()
                 });
@@ -1320,6 +1336,7 @@
                             strength: strength,
                             targetModel: targetModel,
                             length: requestBody.length,
+                            depth: requestBody.depth || "standard",
                             model: data.model,
                             timestamp: Date.now()
                         });
@@ -1650,6 +1667,7 @@
             updateStrengthHint();
             setChipGroupValue("targetChips", entry.targetModel || "");
             setChipGroupValue("lengthChips", entry.length || "standard");
+            setChipGroupValue("qualityChips", entry.depth || "standard");
             renderOptimizedResult(entry.optimized || "", entry.explanation || "", entry.model, entry.raw || "");
         }
 
