@@ -7,6 +7,16 @@ import {
   callCompletion,
 } from "../_lib/optimizer.js";
 
+export async function onRequestGet({ env }) {
+  try {
+    const config = resolveProviderConfig({}, env);
+    const first = config.attempts[0];
+    return json({ ok: true, provider: first.provider || null, model: first.model || null, source: config.source });
+  } catch (e) {
+    return json({ ok: true, provider: null, model: null, source: "none" });
+  }
+}
+
 export async function onRequestPost({ request, env }) {
   let body;
   try {

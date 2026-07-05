@@ -33,6 +33,30 @@ export const PROVIDER_PRESETS = {
     baseUrl: "https://api.anthropic.com",
     defaultModel: "claude-haiku-4-5-20251001",
   },
+  xai: {
+    label: "xAI",
+    mode: "chat",
+    baseUrl: "https://api.x.ai/v1",
+    defaultModel: "grok-4.3",
+  },
+  "opencode-go": {
+    label: "Opencode Go",
+    mode: "chat",
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    defaultModel: "opencode-go/kimi-k2.7-code",
+  },
+  "opencode-zen": {
+    label: "Opencode Zen",
+    mode: "chat",
+    baseUrl: "https://opencode.ai/zen/v1",
+    defaultModel: "opencode/gpt-5.5",
+  },
+  cloudflare: {
+    label: "Cloudflare Workers AI",
+    mode: "chat",
+    baseUrl: "",
+    defaultModel: "",
+  },
   custom: {
     label: "Custom (OpenAI-compatible)",
     mode: "chat",
@@ -328,7 +352,7 @@ export function resolveProviderConfig(body, env) {
     const model = bodyModel || (preset ? preset.defaultModel : "");
     if (!baseUrl) throw new ValidationError("A base URL is required for a custom provider.");
     if (!model) throw new ValidationError("A model is required.");
-    return { attempts: [{ mode, baseUrl, apiKey: bodyApiKey, model }], source: "byo" };
+    return { attempts: [{ mode, baseUrl, apiKey: bodyApiKey, model, provider: bodyProvider || "custom" }], source: "byo" };
   }
 
   // No client key supplied — try the server's shared hosted-instance key(s).
@@ -356,7 +380,7 @@ export function resolveProviderConfig(body, env) {
       .map((m) => m.trim())
       .filter(Boolean);
     if (!models.length) models.push(preset.defaultModel);
-    for (const model of models) attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model });
+    for (const model of models) attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model, provider });
   });
 
   if (attempts.length) return { attempts, source: "hosted" };

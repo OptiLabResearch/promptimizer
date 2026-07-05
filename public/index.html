@@ -31,8 +31,9 @@
     --success-text: #22a06b;
     --success-bg: #e9f7f0;
     --success-border: #c4ead7;
-    --tooltip-bg: #1b1d26;
-    --tooltip-text: #e8e9ee;
+    --tooltip-bg: #ffffff;
+    --tooltip-text: var(--text-soft);
+    --tooltip-border: var(--border);
     --card-shadow: 0 1px 3px rgba(20, 20, 30, 0.05);
     --menu-shadow: 0 8px 24px rgba(20, 20, 30, 0.12);
   }
@@ -55,6 +56,9 @@
     --success-border: oklch(0.62 0.15 155 / 0.3);
     --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     --menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --tooltip-bg: #20222c;
+    --tooltip-text: var(--text-soft);
+    --tooltip-border: var(--border-hover);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -203,7 +207,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 16px;
+    padding: 0 16px;
+    height: 56px;
+    box-sizing: border-box;
     border-bottom: 1px solid var(--line);
   }
 
@@ -246,7 +252,7 @@
   #rawPrompt::placeholder { color: var(--text-mut); }
 
   /* ---------- Options card ---------- */
-  .options-card { flex: none; }
+  .options-card { flex: none; overflow: visible; }
 
   .options-toggle {
     background: none;
@@ -325,7 +331,8 @@
     visibility: hidden;
     transition: opacity 0.1s ease;
     pointer-events: none;
-    box-shadow: var(--menu-shadow);
+    border: 1px solid var(--tooltip-border);
+    box-shadow: 0 4px 14px rgba(20, 20, 30, 0.10);
     z-index: 10;
   }
 
@@ -337,8 +344,10 @@
     width: 8px;
     height: 8px;
     background: var(--tooltip-bg);
+    border-right: 1px solid var(--tooltip-border);
+    border-bottom: 1px solid var(--tooltip-border);
     transform: rotate(45deg);
-    margin-top: -4px;
+    margin-top: -5px;
   }
 
   .technique-item .tooltip-bubble { left: 0; transform: none; }
@@ -407,24 +416,42 @@
   .cta-btn {
     flex: none;
     width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--accent);
     color: #fff;
     font-size: 15px;
     font-weight: 600;
     border: none;
     border-radius: 9px;
-    padding: 13px;
+    padding: 12px;
     cursor: pointer;
     transition: filter 0.15s ease;
   }
   .cta-btn:hover { filter: brightness(1.12); }
   .cta-btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
 
+  .cta-container {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+    padding-bottom: 12px;
+  }
+
   .cta-hint {
     flex: none;
     text-align: center;
     font-size: 12px;
     color: var(--text-mut);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    box-sizing: border-box;
   }
 
   kbd {
@@ -690,6 +717,10 @@
 
   .copy-btn {
     flex: 1;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--accent);
     color: #fff;
     text-align: center;
@@ -704,6 +735,10 @@
   .copy-btn:hover { filter: brightness(1.12); }
 
   .save-btn {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--gold-border);
     background: var(--gold-bg);
     color: var(--gold-text);
@@ -722,6 +757,10 @@
   }
 
   .menu-btn {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--border);
     background: transparent;
     border-radius: 8px;
@@ -947,6 +986,480 @@
     color: var(--text-mut);
   }
 
+  /* ---------- Modal (API settings) ---------- */
+  .modal-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-scrim.open { opacity: 1; visibility: visible; }
+
+  .modal-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--menu-shadow);
+    width: 420px;
+    max-width: 100%;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    transform: translateY(8px);
+    transition: transform 0.2s ease-out;
+  }
+  .modal-scrim.open .modal-panel { transform: translateY(0); }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .modal-title { font-size: 14px; font-weight: 600; }
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 14px;
+    color: var(--text-mid);
+    cursor: pointer;
+    padding: 2px 6px;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-body {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .modal-footer {
+    padding: 12px 18px 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  .form-field { display: flex; flex-direction: column; gap: 6px; }
+  .form-field label { font-size: 12px; font-weight: 600; color: var(--text-mid); }
+
+  .form-input, .form-select {
+    background: var(--panel-inset);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    font-family: inherit;
+    width: 100%;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--border-hover); }
+
+  .form-hint { font-size: 11px; color: var(--text-mut); line-height: 1.5; }
+
+  .modal-btn {
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+  .modal-btn-primary { background: var(--accent); color: #fff; }
+  .modal-btn-primary:hover { filter: brightness(1.12); }
+  .modal-btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text-mid); }
+  .modal-btn-secondary:hover { border-color: var(--border-hover); }
+
+  /* ---------- Library & History (Phase 3) ---------- */
+  .library-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.24s ease-out, visibility 0.24s ease-out;
+    z-index: 20;
+  }
+  .library-scrim.open { opacity: 1; visibility: visible; }
+
+  .library-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 460px;
+    max-width: 100%;
+    background: var(--panel);
+    border-left: 3px solid var(--accent);
+    transform: translateX(100%);
+    transition: transform 0.24s ease-out;
+    z-index: 21;
+    display: flex;
+    flex-direction: column;
+  }
+  .library-panel.open { transform: translateX(0); }
+
+  .library-header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    gap: 12px;
+  }
+
+  .library-header .segmented {
+    flex: 1;
+  }
+
+  .library-close {
+    background: none;
+    border: none;
+    font-size: 14px;
+    color: var(--text-mid);
+    cursor: pointer;
+    padding: 2px 6px;
+  }
+  .library-close:hover { color: var(--text); }
+
+  .library-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .library-search-container {
+    flex: none;
+  }
+
+  .library-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .lib-item, .history-item {
+    background: var(--panel-inset);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s ease;
+  }
+  .lib-item:hover, .history-item:hover {
+    border-color: var(--border-hover);
+  }
+
+  .lib-item-header, .history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .lib-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    border-bottom: 1px dashed var(--accent);
+  }
+
+  .lib-item-name-input {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 2px 6px;
+    outline: none;
+    width: 200px;
+  }
+
+  .lib-item-date, .history-item-date {
+    font-size: 11px;
+    color: var(--text-mut);
+    white-space: nowrap;
+  }
+
+  .lib-item-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .chip-tag {
+    font-size: 11px;
+    background: var(--control);
+    color: var(--text-soft);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .chip-tag-close {
+    cursor: pointer;
+    font-weight: bold;
+    color: var(--text-mut);
+  }
+  .chip-tag-close:hover {
+    color: var(--text);
+  }
+
+  .lib-add-tag-btn {
+    font-size: 11px;
+    background: var(--accent-tint);
+    color: var(--accent-deep);
+    border: 1px dashed var(--accent-tint-strong);
+    border-radius: 4px;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .lib-add-tag-btn:hover {
+    filter: brightness(0.95);
+  }
+
+  .lib-add-tag-input {
+    font-size: 11px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 2px 6px;
+    outline: none;
+    width: 80px;
+    background: var(--panel);
+  }
+
+  .lib-item-snippet, .history-item-snippet {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-soft);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lib-item-actions, .history-item-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .lib-btn, .history-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .lib-btn-primary, .history-btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+  }
+  .lib-btn-primary:hover, .history-btn-primary:hover {
+    filter: brightness(1.1);
+  }
+
+  .lib-btn-danger {
+    background: transparent;
+    border: 1px solid rgba(220, 38, 38, 0.15);
+    color: #dc2626;
+  }
+  .lib-btn-danger:hover {
+    background: rgba(220, 38, 38, 0.05);
+    border-color: #dc2626;
+  }
+
+  .lib-empty, .history-empty {
+    font-size: 13px;
+    color: var(--text-mut);
+    text-align: center;
+    padding: 32px 16px;
+  }
+
+  .library-footer {
+    flex: none;
+    padding: 10px 16px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  /* ---------- Outline upgrades (Phase 4) ---------- */
+  .outline-summary-card {
+    background: var(--accent-tint);
+    border: 1px solid var(--accent-tint-strong);
+    border-radius: 9px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+  .outline-summary-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-deep);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .outline-summary-body {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-soft);
+  }
+  .outline-summary-body ul {
+    margin-left: 18px;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .outline-summary-body li {
+    list-style-type: disc;
+  }
+
+  /* ---------- Diff view (Phase 5) ---------- */
+  ins.diff-add {
+    background-color: var(--success-bg);
+    color: var(--success-text);
+    text-decoration: none;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+  del.diff-del {
+    background-color: rgba(220, 38, 38, 0.12);
+    color: #dc2626;
+    text-decoration: line-through;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+
+  /* ---------- Placeholder compile grid (Phase 5) ---------- */
+  .placeholder-inputs-container {
+    background: var(--panel-inset);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .placeholder-inputs-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-mid);
+    letter-spacing: 0.05em;
+  }
+  .placeholder-inputs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+  }
+  @media (max-width: 600px) {
+    .placeholder-inputs-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .placeholder-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .placeholder-field label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-soft);
+  }
+  .placeholder-field input {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    outline: none;
+  }
+  .placeholder-field input:focus {
+    border-color: var(--border-hover);
+  }
+
+  /* ---------- Refine section (Phase 5) ---------- */
+  .refine-container {
+    border-top: 1px solid var(--line);
+    padding: 12px 16px;
+    background: var(--panel-inset);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .refine-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-mid);
+    letter-spacing: 0.05em;
+  }
+  .refine-row {
+    display: flex;
+    gap: 8px;
+  }
+  .refine-row input {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    outline: none;
+  }
+  .refine-row input:focus {
+    border-color: var(--border-hover);
+  }
+  .refine-submit-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+  .refine-submit-btn:hover {
+    filter: brightness(1.1);
+  }
+  .refine-submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   /* ---------- Page footer ---------- */
   .page-footer {
     flex: none;
@@ -1011,7 +1524,7 @@
       <span class="brand-name">Prompt Optimizer</span>
     </div>
     <div class="topbar-actions">
-      <span class="engine-chip mono" id="engineChip">● claude-sonnet-4 · live</span>
+      <span class="engine-chip mono" id="engineChip">● ready</span>
       <button class="btn-ghost" id="libraryBtn">★ Library</button>
       <button class="btn-ghost" id="historyBtn">↺ History</button>
       <button class="btn-ghost" id="apiBtn">⚙ API</button>
@@ -1083,8 +1596,10 @@
         </div>
       </div>
 
-      <button class="cta-btn" id="optimizeBtn" disabled>✦ Optimize prompt</button>
-      <div class="cta-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to optimize</div>
+      <div class="cta-container">
+        <button class="cta-btn" id="optimizeBtn" disabled>✦ Optimize prompt</button>
+        <div class="cta-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to optimize</div>
+      </div>
     </section>
 
     <section class="output-col">
@@ -1112,6 +1627,15 @@
           <div id="prettyView" style="display:none;"></div>
           <div id="rawView" class="mono" style="display:none; white-space:pre-wrap; font-size:13px; line-height:1.7;"></div>
           <div id="outlineView" style="display:none;"></div>
+        </div>
+
+        <!-- Refinement input container (Phase 5) -->
+        <div class="refine-container" id="refineContainer" style="display: none;">
+          <div class="refine-header">Refine prompt</div>
+          <div class="refine-row">
+            <input type="text" id="refineInput" placeholder="Instruct the model on what to change (e.g. 'make it shorter')...">
+            <button class="refine-submit-btn" id="refineSubmitBtn">Refine</button>
+          </div>
         </div>
 
         <div class="output-footer">
@@ -1143,7 +1667,7 @@
       <a href="#">Features</a>
       <a href="#">Why this exists</a>
       <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
-      <a href="#" class="feedback-pill">💬 Give feedback</a>
+      <a href="#" class="feedback-pill" id="feedbackLink">💬 Give feedback</a>
     </div>
   </footer>
 
@@ -1181,6 +1705,120 @@
     </div>
     <div class="bench-footer">Winner is saved to your library with the test attached.</div>
   </aside>
+
+  <div class="modal-scrim" id="settingsModal" role="dialog" aria-modal="true" aria-label="API settings" aria-hidden="true">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span class="modal-title">API settings</span>
+        <button class="modal-close" id="settingsClose" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-field">
+          <label for="settingsProvider">Provider</label>
+          <select class="form-select" id="settingsProvider">
+            <option value="">Use shared hosted key (if available)</option>
+            <option value="google">Gemini</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="nvidia">NVIDIA</option>
+            <option value="opencode-go">Opencode Go</option>
+            <option value="opencode-zen">Opencode Zen</option>
+            <option value="cloudflare">Cloudflare Workers AI</option>
+            <option value="xai">xAI</option>
+            <option value="custom">Custom (OpenAI-compatible)</option>
+          </select>
+        </div>
+        <div class="form-field" id="settingsApiKeyGroup" style="display:none;">
+          <label for="settingsApiKey">API key</label>
+          <input class="form-input" type="password" id="settingsApiKey" placeholder="sk-...">
+          <span class="form-hint">Stored only in your browser (localStorage), sent directly to the provider per-request. Never touches our server logs.</span>
+        </div>
+        <div class="form-field" id="settingsModelGroup" style="display:none;">
+          <label for="settingsModel">Model</label>
+          <input class="form-input" type="text" id="settingsModel" placeholder="e.g. gpt-4o-mini">
+        </div>
+        <div class="form-field" id="settingsBaseUrlGroup" style="display:none;">
+          <label for="settingsBaseUrl">Base URL</label>
+          <input class="form-input" type="text" id="settingsBaseUrl" placeholder="https://your-endpoint/v1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="settingsCancel">Cancel</button>
+        <button class="modal-btn modal-btn-primary" id="settingsSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Library & History slide-over panel -->
+  <div class="library-scrim" id="libraryScrim"></div>
+  <aside class="library-panel" id="libraryPanel" role="dialog" aria-modal="true" aria-label="Library & History" aria-hidden="true">
+    <div class="library-header">
+      <div class="segmented" id="libraryTabs">
+        <button class="active" data-tab="library">★ Library</button>
+        <button data-tab="history">↺ History</button>
+      </div>
+      <button class="library-close" id="libraryClose" aria-label="Close Library">✕</button>
+    </div>
+    <div class="library-body">
+      <div class="library-search-container" id="librarySearchContainer">
+        <input class="form-input" type="text" id="librarySearchInput" placeholder="Search by name, tag, or content…">
+      </div>
+      <div class="library-list" id="libraryList">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+    <div class="library-footer" id="libraryFooter" style="display: none;">
+      <button class="modal-btn modal-btn-secondary" id="clearHistoryBtn" style="font-size: 12px; padding: 6px 12px; width: 100%;">Clear history</button>
+    </div>
+  </aside>
+
+  <!-- Export Modal -->
+  <div class="modal-scrim" id="exportModal" role="dialog" aria-modal="true" aria-label="Export prompt" aria-hidden="true">
+    <div class="modal-panel" style="width: 360px;">
+      <div class="modal-header">
+        <span class="modal-title">Export prompt</span>
+        <button class="modal-close" id="exportClose" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="modal-btn modal-btn-secondary" id="exportMdBtn" style="justify-content: flex-start; text-align: left; gap: 10px; width: 100%; padding: 10px;">
+          <span>📝</span> Markdown (.md) with metadata
+        </button>
+        <button class="modal-btn modal-btn-secondary" id="exportTxtBtn" style="justify-content: flex-start; text-align: left; gap: 10px; width: 100%; padding: 10px;">
+          <span>📄</span> Plain text (.txt) only
+        </button>
+        <button class="modal-btn modal-btn-secondary" id="exportJsonBtn" style="justify-content: flex-start; text-align: left; gap: 10px; width: 100%; padding: 10px;">
+          <span>⚙️</span> JSON with variables schema
+        </button>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="exportCancel" style="width: 100%;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback Modal -->
+  <div class="modal-scrim" id="feedbackModal" role="dialog" aria-modal="true" aria-label="Give feedback" aria-hidden="true">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span class="modal-title">Give feedback</span>
+        <button class="modal-close" id="feedbackClose" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="form-field">
+          <label for="feedbackEmail">Email (optional)</label>
+          <input class="form-input" type="email" id="feedbackEmail" placeholder="you@example.com">
+        </div>
+        <div class="form-field">
+          <label for="feedbackMessage">Message</label>
+          <textarea class="form-input" id="feedbackMessage" rows="4" placeholder="What can we improve? Let us know..." style="resize: vertical; min-height: 80px;"></textarea>
+        </div>
+        <div class="bench-error" id="feedbackError" style="margin-top: 0;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="feedbackCancel">Cancel</button>
+        <button class="modal-btn modal-btn-primary" id="feedbackSend">Send feedback</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     (function () {
@@ -1244,7 +1882,7 @@
       }
 
       var storedOptionsOpen = localStorage.getItem(OPTIONS_KEY);
-      setOptionsOpen(storedOptionsOpen === null ? true : storedOptionsOpen === 'true');
+      setOptionsOpen(storedOptionsOpen === null ? false : storedOptionsOpen === 'true');
 
       optionsToggle.addEventListener('click', function () {
         var isOpen = !optionsBody.classList.contains('collapsed');
@@ -1307,6 +1945,13 @@
             closeBench();
             return;
           }
+          if (libraryOpen) {
+            closeLibraryPanel();
+            return;
+          }
+          closeSettings();
+          closeExportModal();
+          closeFeedbackModal();
           closeDevMenu();
           closeAllTooltips();
         }
@@ -1328,12 +1973,25 @@
 
       document.addEventListener('click', function () { closeDevMenu(); });
 
-      // Developer tools items (except Test Bench) are visual stubs
-      ['diffBtn', 'previewBtn', 'exportBtn', 'refineBtn'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('click', function () {
-          closeDevMenu();
-        });
+      // ---------- Developer tools triggers ----------
+      document.getElementById('diffBtn').addEventListener('click', function () {
+        closeDevMenu();
+        toggleDiffView();
+      });
+
+      document.getElementById('previewBtn').addEventListener('click', function () {
+        closeDevMenu();
+        togglePreviewCompiled();
+      });
+
+      document.getElementById('exportBtn').addEventListener('click', function () {
+        closeDevMenu();
+        openExportModal();
+      });
+
+      document.getElementById('refineBtn').addEventListener('click', function () {
+        closeDevMenu();
+        toggleRefineRow();
       });
 
       document.getElementById('testBenchBtn').addEventListener('click', function () {
@@ -1361,13 +2019,125 @@
       var saveBtn = document.getElementById('saveBtn');
       var saved = false;
 
-      // ---------- Stub buttons (Library / History / API) ----------
-      ['libraryBtn', 'historyBtn', 'apiBtn'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('click', function () {
-          // Visual stub — panel not built yet (per handoff scope).
-        });
+      // ---------- Library & History will be wired at bottom ----------
+
+      // ---------- API settings modal ----------
+      var engineChip = document.getElementById('engineChip');
+      var SETTINGS_KEY = 'promptOptimizerSettings';
+      var PROVIDER_DEFAULTS = {
+        google: { model: 'gemini-3-5-flash' },
+        openrouter: { model: 'nvidia/nemotron-3-ultra-550b-a55b:free' },
+        nvidia: { model: 'minimaxai/minimax-m3' },
+        'opencode-go': { model: 'opencode-go/kimi-k2.7-code' },
+        'opencode-zen': { model: 'opencode/gpt-5.5' },
+        cloudflare: { model: '@cf/meta/llama-3.1-8b-instruct' },
+        xai: { model: 'grok-4.3' },
+        custom: { model: '' }
+      };
+
+      function loadSettings() {
+        try {
+          var raw = localStorage.getItem(SETTINGS_KEY);
+          return raw ? JSON.parse(raw) : { provider: '', apiKey: '', model: '', baseUrl: '' };
+        } catch (e) {
+          return { provider: '', apiKey: '', model: '', baseUrl: '' };
+        }
+      }
+
+      function saveSettingsObj(settings) {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      }
+
+      function providerFields() {
+        var settings = loadSettings();
+        if (!settings.apiKey || !settings.provider) return {};
+        var fields = { provider: settings.provider, api_key: settings.apiKey };
+        if (settings.model) fields.model = settings.model;
+        if (settings.baseUrl) fields.base_url = settings.baseUrl;
+        return fields;
+      }
+
+      function refreshEngineChip() {
+        var settings = loadSettings();
+        if (settings.apiKey && settings.provider) {
+          engineChip.textContent = '● ' + settings.provider + ' (' + (settings.model || 'default') + ')';
+          engineChip.classList.remove('offline');
+          return;
+        }
+        fetch('/api/optimize-prompt')
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data && data.model) {
+              engineChip.textContent = '● ' + data.model + ' · live';
+              engineChip.classList.remove('offline');
+            } else {
+              engineChip.textContent = '● ready';
+              engineChip.classList.remove('offline');
+            }
+          })
+          .catch(function () {
+            engineChip.textContent = '● ready';
+          });
+      }
+
+      var settingsModal = document.getElementById('settingsModal');
+      var settingsProvider = document.getElementById('settingsProvider');
+      var settingsApiKey = document.getElementById('settingsApiKey');
+      var settingsModel = document.getElementById('settingsModel');
+      var settingsBaseUrl = document.getElementById('settingsBaseUrl');
+      var settingsApiKeyGroup = document.getElementById('settingsApiKeyGroup');
+      var settingsModelGroup = document.getElementById('settingsModelGroup');
+      var settingsBaseUrlGroup = document.getElementById('settingsBaseUrlGroup');
+
+      function onProviderChange() {
+        var provider = settingsProvider.value;
+        var needsBaseUrl = provider === 'custom' || provider === 'cloudflare';
+        settingsBaseUrlGroup.style.display = needsBaseUrl ? 'flex' : 'none';
+        settingsApiKeyGroup.style.display = provider ? 'flex' : 'none';
+        settingsModelGroup.style.display = provider ? 'flex' : 'none';
+        if (provider && !settingsModel.value) {
+          settingsModel.value = (PROVIDER_DEFAULTS[provider] || {}).model || '';
+        }
+      }
+      settingsProvider.addEventListener('change', onProviderChange);
+
+      function openSettings() {
+        var settings = loadSettings();
+        settingsProvider.value = settings.provider || '';
+        settingsApiKey.value = settings.apiKey || '';
+        settingsModel.value = settings.model || '';
+        settingsBaseUrl.value = settings.baseUrl || '';
+        onProviderChange();
+        settingsModal.classList.add('open');
+        settingsModal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeSettings() {
+        settingsModal.classList.remove('open');
+        settingsModal.setAttribute('aria-hidden', 'true');
+      }
+
+      document.getElementById('apiBtn').addEventListener('click', openSettings);
+      document.getElementById('settingsClose').addEventListener('click', closeSettings);
+      document.getElementById('settingsCancel').addEventListener('click', closeSettings);
+      settingsModal.addEventListener('click', function (e) {
+        if (e.target === settingsModal) closeSettings();
       });
+
+      document.getElementById('settingsSave').addEventListener('click', function () {
+        var provider = settingsProvider.value;
+        var needsBaseUrl = provider === 'custom' || provider === 'cloudflare';
+        saveSettingsObj({
+          provider: provider,
+          apiKey: provider ? settingsApiKey.value.trim() : '',
+          model: provider ? settingsModel.value.trim() : '',
+          baseUrl: needsBaseUrl ? settingsBaseUrl.value.trim() : ''
+        });
+        refreshEngineChip();
+        closeSettings();
+      });
+
+      refreshEngineChip();
 
       // ==================================================================
       // ---------- Optimize flow & output views ----------
@@ -1411,6 +2181,20 @@
         viewTabs.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         activeView = btn.getAttribute('data-view');
+        
+        if (activeView !== 'raw') {
+          if (diffModeOn) {
+            diffModeOn = false;
+            document.getElementById('diffBtn').textContent = '⇄ View diff vs raw';
+          }
+          if (previewCompiledMode) {
+            previewCompiledMode = false;
+            document.getElementById('previewBtn').textContent = '👁 Preview compiled prompt';
+            var container = document.getElementById('placeholderInputsContainer');
+            if (container) container.remove();
+          }
+        }
+        
         renderOutputBody();
       });
 
@@ -1518,6 +2302,23 @@
 
       function renderOutline() {
         outlineView.innerHTML = '';
+
+        if (currentResult && currentResult.explanation) {
+          var summaryCard = document.createElement('div');
+          summaryCard.className = 'outline-summary-card';
+          
+          var summaryTitle = document.createElement('div');
+          summaryTitle.className = 'outline-summary-title';
+          summaryTitle.textContent = 'Optimization Summary';
+          summaryCard.appendChild(summaryTitle);
+
+          var summaryBody = document.createElement('div');
+          summaryBody.className = 'outline-summary-body';
+          summaryBody.innerHTML = formatExplanation(currentResult.explanation);
+          summaryCard.appendChild(summaryBody);
+
+          outlineView.appendChild(summaryCard);
+        }
 
         var meta = document.createElement('div');
         meta.className = 'outline-meta';
@@ -1652,6 +2453,8 @@
         var list = readList(LIBRARY_KEY);
         list.push({
           id: id,
+          name: 'Prompt ' + new Date().toLocaleDateString(),
+          tags: [],
           input: promptText,
           options: options,
           result: result,
@@ -1693,7 +2496,8 @@
           strength: state.style,
           depth: state.quality,
           target_model: mapTarget(state.target),
-          techniques: state.techniques.map(mapTechnique)
+          techniques: state.techniques.map(mapTechnique),
+          ...providerFields()
         };
 
         fetch('/api/optimize-prompt', {
@@ -1887,6 +2691,8 @@
         });
       });
 
+      var benchAbortController = null;
+
       benchRun.addEventListener('click', function () {
         var promptText = rawPrompt.value.trim();
         var optimizedText = currentResult && currentResult.optimized_prompt;
@@ -1903,15 +2709,30 @@
         benchBodyA.textContent = 'Running…';
         benchBodyB.textContent = 'Running…';
 
+        if (benchAbortController) {
+          benchAbortController.abort();
+        }
+        benchAbortController = new AbortController();
+        var signal = benchAbortController.signal;
+
+        var timeoutId = setTimeout(function () {
+          if (benchAbortController) {
+            benchAbortController.abort();
+          }
+        }, 30000);
+
         fetch('/api/optimize-prompt/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             original: mergeTestInput(promptText, bench.input),
-            optimized: mergeTestInput(optimizedText, bench.input)
-          })
+            optimized: mergeTestInput(optimizedText, bench.input),
+            ...providerFields()
+          }),
+          signal: signal
         })
           .then(function (res) {
+            clearTimeout(timeoutId);
             return res.json().then(function (data) { return { ok: res.ok, data: data }; });
           })
           .then(function (result) {
@@ -1923,15 +2744,869 @@
             benchBodyB.textContent = bench.responseB;
           })
           .catch(function (err) {
+            clearTimeout(timeoutId);
             bench.responseA = null;
             bench.responseB = null;
             benchBodyA.textContent = 'Run a comparison to see the response.';
             benchBodyB.textContent = 'Run a comparison to see the response.';
-            setBenchError((err && err.message) || 'Comparison failed.');
+            if (err.name === 'AbortError') {
+              setBenchError('Comparison failed (request timed out or aborted).');
+            } else {
+              setBenchError((err && err.message) || 'Comparison failed.');
+            }
           })
           .then(function () {
             benchRun.disabled = false;
             benchRun.textContent = 'Run comparison';
+            benchAbortController = null;
+          });
+      });
+
+      // ---------- Format explanation utility (Phase 4) ----------
+      function formatExplanation(text) {
+        if (!text) return '';
+        var html = '';
+        var insideList = false;
+        var lines = text.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line) continue;
+          if (line.indexOf('-') === 0 || line.indexOf('*') === 0) {
+            if (!insideList) {
+              html += '<ul>';
+              insideList = true;
+            }
+            var content = line.substring(1).trim();
+            content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html += '<li>' + content + '</li>';
+          } else {
+            if (insideList) {
+              html += '</ul>';
+              insideList = false;
+            }
+            var content2 = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html += '<p style="margin-bottom: 0.5rem;">' + content2 + '</p>';
+          }
+        }
+        if (insideList) html += '</ul>';
+        return html;
+      }
+
+      // ---------- Library & History variables & state ----------
+      var libraryOpen = false;
+      var currentLibraryTab = 'library';
+
+      var libraryScrim = document.getElementById('libraryScrim');
+      var libraryPanel = document.getElementById('libraryPanel');
+      var libraryClose = document.getElementById('libraryClose');
+      var libraryTabs = document.getElementById('libraryTabs');
+      var librarySearchInput = document.getElementById('librarySearchInput');
+      var libraryList = document.getElementById('libraryList');
+      var libraryFooter = document.getElementById('libraryFooter');
+      var clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+      function openLibraryPanel(tab) {
+        libraryOpen = true;
+        currentLibraryTab = tab || 'library';
+        libraryScrim.classList.add('open');
+        libraryPanel.classList.add('open');
+        libraryPanel.setAttribute('aria-hidden', 'false');
+        
+        libraryTabs.querySelectorAll('button').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-tab') === currentLibraryTab);
+        });
+
+        var searchContainer = document.getElementById('librarySearchContainer');
+        searchContainer.style.display = currentLibraryTab === 'library' ? '' : 'none';
+        libraryFooter.style.display = currentLibraryTab === 'history' ? 'flex' : 'none';
+
+        if (currentLibraryTab === 'library') {
+          renderLibrary();
+        } else {
+          renderHistory();
+        }
+      }
+
+      function closeLibraryPanel() {
+        libraryOpen = false;
+        libraryScrim.classList.remove('open');
+        libraryPanel.classList.remove('open');
+        libraryPanel.setAttribute('aria-hidden', 'true');
+      }
+
+      libraryClose.addEventListener('click', closeLibraryPanel);
+      libraryScrim.addEventListener('click', closeLibraryPanel);
+
+      libraryTabs.addEventListener('click', function (e) {
+        var btn = e.target.closest('button');
+        if (!btn || !libraryTabs.contains(btn)) return;
+        var tab = btn.getAttribute('data-tab');
+        openLibraryPanel(tab);
+      });
+
+      document.getElementById('libraryBtn').addEventListener('click', function () {
+        openLibraryPanel('library');
+      });
+      document.getElementById('historyBtn').addEventListener('click', function () {
+        openLibraryPanel('history');
+      });
+
+      librarySearchInput.addEventListener('input', renderLibrary);
+
+      function renderLibrary() {
+        var query = librarySearchInput.value.trim().toLowerCase();
+        var items = readList(LIBRARY_KEY);
+
+        var filtered = items.filter(function (item) {
+          if (!query) return true;
+          var nameMatch = (item.name || '').toLowerCase().indexOf(query) !== -1;
+          var inputMatch = (item.input || '').toLowerCase().indexOf(query) !== -1;
+          var outputMatch = (item.result && item.result.optimized_prompt || '').toLowerCase().indexOf(query) !== -1;
+          var tagMatch = (item.tags || []).some(function (tag) {
+            return tag.toLowerCase().indexOf(query) !== -1;
+          });
+          return nameMatch || inputMatch || outputMatch || tagMatch;
+        });
+
+        libraryList.innerHTML = '';
+        if (filtered.length === 0) {
+          var empty = document.createElement('div');
+          empty.className = 'lib-empty';
+          empty.textContent = query ? 'No matching prompts found.' : 'Your library is empty. Save optimizations to keep them here.';
+          libraryList.appendChild(empty);
+          return;
+        }
+
+        filtered.forEach(function (item) {
+          var el = document.createElement('div');
+          el.className = 'lib-item';
+
+          var header = document.createElement('div');
+          header.className = 'lib-item-header';
+          
+          var nameSpan = document.createElement('span');
+          nameSpan.className = 'lib-item-name';
+          nameSpan.textContent = item.name || 'Untitled Prompt';
+          nameSpan.title = 'Click to rename';
+          nameSpan.addEventListener('click', function () {
+            startRename(item.id, nameSpan);
+          });
+
+          var dateSpan = document.createElement('span');
+          dateSpan.className = 'lib-item-date';
+          dateSpan.textContent = new Date(item.savedAt).toLocaleDateString();
+
+          header.appendChild(nameSpan);
+          header.appendChild(dateSpan);
+          el.appendChild(header);
+
+          var tagsDiv = document.createElement('div');
+          tagsDiv.className = 'lib-item-tags';
+          
+          (item.tags || []).forEach(function (tag) {
+            var tagChip = document.createElement('span');
+            tagChip.className = 'chip-tag';
+            tagChip.textContent = tag + ' ';
+            
+            var closeBtn = document.createElement('span');
+            closeBtn.className = 'chip-tag-close';
+            closeBtn.textContent = '×';
+            closeBtn.addEventListener('click', function (e) {
+              e.stopPropagation();
+              deleteTag(item.id, tag);
+            });
+            tagChip.appendChild(closeBtn);
+            tagsDiv.appendChild(tagChip);
+          });
+
+          var addTagBtn = document.createElement('button');
+          addTagBtn.className = 'lib-add-tag-btn';
+          addTagBtn.textContent = '+ tag';
+          addTagBtn.addEventListener('click', function () {
+            startAddTag(item.id, addTagBtn, tagsDiv);
+          });
+          tagsDiv.appendChild(addTagBtn);
+          el.appendChild(tagsDiv);
+
+          var snippet = document.createElement('div');
+          snippet.className = 'lib-item-snippet mono';
+          snippet.textContent = item.input || '';
+          el.appendChild(snippet);
+
+          var actions = document.createElement('div');
+          actions.className = 'lib-item-actions';
+
+          var loadBtn = document.createElement('button');
+          loadBtn.className = 'lib-btn lib-btn-primary';
+          loadBtn.textContent = '✏️ Load';
+          loadBtn.addEventListener('click', function () {
+            loadEntry(item, true);
+          });
+
+          var delBtn = document.createElement('button');
+          delBtn.className = 'lib-btn lib-btn-danger';
+          delBtn.textContent = '🗑️ Delete';
+          delBtn.addEventListener('click', function () {
+            deleteLibraryItem(item.id);
+          });
+
+          actions.appendChild(loadBtn);
+          actions.appendChild(delBtn);
+          el.appendChild(actions);
+
+          libraryList.appendChild(el);
+        });
+      }
+
+      function startRename(id, spanEl) {
+        var currentName = spanEl.textContent;
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'lib-item-name-input';
+        input.value = currentName;
+        
+        function commit() {
+          var name = input.value.trim();
+          if (name) {
+            finishRename(id, name);
+          } else {
+            renderLibrary();
+          }
+        }
+
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') renderLibrary();
+        });
+
+        spanEl.replaceWith(input);
+        input.focus();
+        input.select();
+      }
+
+      function finishRename(id, newName) {
+        var items = readList(LIBRARY_KEY);
+        items.forEach(function (item) {
+          if (item.id === id) item.name = newName;
+        });
+        writeList(LIBRARY_KEY, items);
+        renderLibrary();
+      }
+
+      function startAddTag(id, btnEl, parentEl) {
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'lib-add-tag-input';
+        input.placeholder = 'tag name…';
+
+        function commit() {
+          var tagName = input.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          if (tagName) {
+            finishAddTag(id, tagName);
+          } else {
+            renderLibrary();
+          }
+        }
+
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') renderLibrary();
+        });
+
+        btnEl.replaceWith(input);
+        input.focus();
+      }
+
+      function finishAddTag(id, tagName) {
+        var items = readList(LIBRARY_KEY);
+        items.forEach(function (item) {
+          if (item.id === id) {
+            if (!item.tags) item.tags = [];
+            if (item.tags.indexOf(tagName) === -1) item.tags.push(tagName);
+          }
+        });
+        writeList(LIBRARY_KEY, items);
+        renderLibrary();
+      }
+
+      function deleteTag(id, tagName) {
+        var items = readList(LIBRARY_KEY);
+        items.forEach(function (item) {
+          if (item.id === id && item.tags) {
+            item.tags = item.tags.filter(function (t) { return t !== tagName; });
+          }
+        });
+        writeList(LIBRARY_KEY, items);
+        renderLibrary();
+      }
+
+      function deleteLibraryItem(id) {
+        if (!confirm('Are you sure you want to delete this saved prompt from your library?')) return;
+        removeFromLibrary(id);
+        if (libraryEntryId === id) {
+          libraryEntryId = null;
+          saved = false;
+          saveBtn.classList.remove('saved');
+          saveBtn.textContent = '☆ Save';
+        }
+        renderLibrary();
+      }
+
+      function renderHistory() {
+        var items = readList(HISTORY_KEY);
+        libraryList.innerHTML = '';
+        
+        if (items.length === 0) {
+          var empty = document.createElement('div');
+          empty.className = 'history-empty';
+          empty.textContent = 'No optimizations yet.';
+          libraryList.appendChild(empty);
+          return;
+        }
+
+        var reversed = items.slice().reverse();
+        reversed.forEach(function (item, index) {
+          var el = document.createElement('div');
+          el.className = 'history-item';
+          
+          var header = document.createElement('div');
+          header.className = 'history-item-header';
+          
+          var strength = document.createElement('span');
+          strength.className = 'lib-item-name';
+          strength.textContent = (item.options && item.options.style) || 'balanced';
+          strength.style.borderBottom = 'none';
+          strength.style.cursor = 'default';
+
+          var dateSpan = document.createElement('span');
+          dateSpan.className = 'history-item-date';
+          dateSpan.textContent = new Date(item.timestamp).toLocaleString();
+
+          header.appendChild(strength);
+          header.appendChild(dateSpan);
+          el.appendChild(header);
+
+          var snippet = document.createElement('div');
+          snippet.className = 'history-item-snippet mono';
+          snippet.textContent = item.input || '';
+          el.appendChild(snippet);
+
+          var actions = document.createElement('div');
+          actions.className = 'history-item-actions';
+
+          var loadBtn = document.createElement('button');
+          loadBtn.className = 'history-btn history-btn-primary';
+          loadBtn.textContent = '✏️ Load';
+          loadBtn.addEventListener('click', function () {
+            loadEntry(item, false);
+          });
+
+          actions.appendChild(loadBtn);
+          el.appendChild(actions);
+
+          libraryList.appendChild(el);
+        });
+      }
+
+      clearHistoryBtn.addEventListener('click', function () {
+        if (!confirm('Are you sure you want to clear all history entries?')) return;
+        writeList(HISTORY_KEY, []);
+        renderHistory();
+      });
+
+      function restoreOptions(options) {
+        if (!options) return;
+        state.style = options.style || 'balanced';
+        state.quality = options.quality || 'standard';
+        state.target = options.target || 'generic';
+        state.techniques = Array.isArray(options.techniques) ? options.techniques.slice() : [];
+
+        document.querySelectorAll('.segmented').forEach(function (group) {
+          var key = group.getAttribute('data-group');
+          if (!key) return;
+          var val = state[key];
+          group.querySelectorAll('button').forEach(function (b) {
+            b.classList.toggle('active', b.getAttribute('data-value') === val);
+          });
+        });
+
+        document.querySelectorAll('[data-technique]').forEach(function (checkbox) {
+          var key = checkbox.getAttribute('data-technique');
+          checkbox.checked = state.techniques.indexOf(key) !== -1;
+        });
+      }
+
+      function loadEntry(entry, fromLibrary) {
+        rawPrompt.value = entry.input || '';
+        rawPrompt.dispatchEvent(new Event('input'));
+
+        restoreOptions(entry.options);
+
+        currentResult = entry.result;
+        status = 'done';
+
+        renderPretty(currentResult.optimized_prompt);
+        rawView.textContent = currentResult.optimized_prompt || '';
+
+        outlineExpanded = {};
+        outlineExpandAll = false;
+        renderOutline();
+
+        setActiveView('pretty');
+        renderOutputBody();
+
+        optimizeAnotherBtn.style.display = 'block';
+
+        if (fromLibrary) {
+          saved = true;
+          libraryEntryId = entry.id;
+          saveBtn.classList.add('saved');
+          saveBtn.textContent = '★ Saved';
+        } else {
+          var libList = readList(LIBRARY_KEY);
+          var match = libList.filter(function (item) {
+            return item.input === entry.input && item.result.optimized_prompt === entry.result.optimized_prompt;
+          })[0];
+          if (match) {
+            saved = true;
+            libraryEntryId = match.id;
+            saveBtn.classList.add('saved');
+            saveBtn.textContent = '★ Saved';
+          } else {
+            saved = false;
+            libraryEntryId = null;
+            saveBtn.classList.remove('saved');
+            saveBtn.textContent = '☆ Save';
+          }
+        }
+
+        if (currentResult.model) {
+          engineChip.textContent = '● ' + currentResult.model + ' · live';
+          engineChip.classList.remove('offline');
+        }
+
+        closeLibraryPanel();
+      }
+
+      // ---------- Diff view logic (Phase 5) ----------
+      var diffModeOn = false;
+      var DIFF_WORD_LIMIT = 1500;
+
+      function computeWordDiff(a, b) {
+        var aw = a.split(/(\s+)/);
+        var bw = b.split(/(\s+)/);
+        var n = aw.length, m = bw.length;
+        var dp = Array.from({ length: n + 1 }, function () { return new Int32Array(m + 1); });
+        for (var i = n - 1; i >= 0; i--) {
+          for (var j = m - 1; j >= 0; j--) {
+            dp[i][j] = aw[i] === bw[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+          }
+        }
+        var i2 = 0, j2 = 0;
+        var ops = [];
+        while (i2 < n && j2 < m) {
+          if (aw[i2] === bw[j2]) {
+            ops.push(['eq', aw[i2]]);
+            i2++;
+            j2++;
+          } else if (dp[i2 + 1][j2] >= dp[i2][j2 + 1]) {
+            ops.push(['del', aw[i2]]);
+            i2++;
+          } else {
+            ops.push(['add', bw[j2]]);
+            j2++;
+          }
+        }
+        while (i2 < n) {
+          ops.push(['del', aw[i2]]);
+          i2++;
+        }
+        while (j2 < m) {
+          ops.push(['add', bw[j2]]);
+          j2++;
+        }
+        return ops;
+      }
+
+      function toggleDiffView() {
+        if (status !== 'done' || !currentResult) return;
+        diffModeOn = !diffModeOn;
+        var diffBtn = document.getElementById('diffBtn');
+
+        if (diffModeOn) {
+          var original = rawPrompt.value;
+          var optimized = currentResult.optimized_prompt;
+          var aWords = original.split(/\s+/).length;
+          var bWords = optimized.split(/\s+/).length;
+
+          if (aWords > DIFF_WORD_LIMIT || bWords > DIFF_WORD_LIMIT) {
+            alert('Diff view isn\'t available for prompts this long.');
+            diffModeOn = false;
+            return;
+          }
+
+          var ops = computeWordDiff(original, optimized);
+          rawView.innerHTML = ops.map(function (op) {
+            var escaped = escapeHtml(op[1]);
+            if (op[0] === 'eq') return escaped;
+            if (op[0] === 'add') return '<ins class="diff-add">' + escaped + '</ins>';
+            return '<del class="diff-del">' + escaped + '</del>';
+          }).join('');
+
+          diffBtn.textContent = '✓ Diff active';
+          setActiveView('raw');
+          renderOutputBody();
+        } else {
+          rawView.textContent = currentResult.optimized_prompt || '';
+          diffBtn.textContent = '⇄ View diff vs raw';
+        }
+      }
+
+      function escapeHtml(text) {
+        if (!text) return '';
+        return text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      // ---------- Compiled Preview (Phase 5) ----------
+      var previewCompiledMode = false;
+      var PLACEHOLDER_REGEX = /\{\{[^{}]{1,80}\}\}|\[[A-Z][A-Z0-9 _\-]{1,60}\]/g;
+      var placeholderValues = {};
+
+      function togglePreviewCompiled() {
+        if (status !== 'done' || !currentResult) return;
+        previewCompiledMode = !previewCompiledMode;
+        var previewBtn = document.getElementById('previewBtn');
+
+        if (previewCompiledMode) {
+          previewBtn.textContent = '👁 Hide compiled preview';
+          renderCompiledPreview();
+          setActiveView('raw');
+          renderOutputBody();
+        } else {
+          previewBtn.textContent = '👁 Preview compiled prompt';
+          var container = document.getElementById('placeholderInputsContainer');
+          if (container) container.remove();
+          rawView.textContent = currentResult.optimized_prompt || '';
+        }
+      }
+
+      function renderCompiledPreview() {
+        var text = currentResult.optimized_prompt || '';
+        var matches = text.match(PLACEHOLDER_REGEX) || [];
+        var uniquePlaceholders = Array.from(new Set(matches));
+
+        var existing = document.getElementById('placeholderInputsContainer');
+        if (existing) existing.remove();
+
+        if (uniquePlaceholders.length > 0) {
+          var container = document.createElement('div');
+          container.id = 'placeholderInputsContainer';
+          container.className = 'placeholder-inputs-container';
+
+          var title = document.createElement('div');
+          title.className = 'placeholder-inputs-title';
+          title.textContent = 'Fill Placeholders';
+          container.appendChild(title);
+
+          var grid = document.createElement('div');
+          grid.className = 'placeholder-inputs-grid';
+
+          uniquePlaceholders.forEach(function (ph) {
+            if (!(ph in placeholderValues)) {
+              placeholderValues[ph] = '';
+            }
+
+            var field = document.createElement('div');
+            field.className = 'placeholder-field';
+
+            var label = document.createElement('label');
+            label.textContent = ph;
+            
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.value = placeholderValues[ph];
+            input.placeholder = 'Value for ' + ph;
+            input.addEventListener('input', function () {
+              placeholderValues[ph] = input.value;
+              updateCompiledText();
+            });
+
+            field.appendChild(label);
+            field.appendChild(input);
+            grid.appendChild(field);
+          });
+
+          container.appendChild(grid);
+          rawView.parentNode.insertBefore(container, rawView);
+        }
+
+        updateCompiledText();
+      }
+
+      function updateCompiledText() {
+        var text = currentResult.optimized_prompt || '';
+        var compiled = text.replace(PLACEHOLDER_REGEX, function (ph) {
+          var val = placeholderValues[ph];
+          if (val) {
+            return val;
+          }
+          return ph;
+        });
+        rawView.textContent = compiled;
+      }
+
+      // ---------- Export modal (Phase 5) ----------
+      var exportModal = document.getElementById('exportModal');
+      var exportClose = document.getElementById('exportClose');
+      var exportCancel = document.getElementById('exportCancel');
+      var exportMdBtn = document.getElementById('exportMdBtn');
+      var exportTxtBtn = document.getElementById('exportTxtBtn');
+      var exportJsonBtn = document.getElementById('exportJsonBtn');
+
+      function openExportModal() {
+        if (status !== 'done' || !currentResult) return;
+        exportModal.classList.add('open');
+        exportModal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeExportModal() {
+        exportModal.classList.remove('open');
+        exportModal.setAttribute('aria-hidden', 'true');
+      }
+
+      exportClose.addEventListener('click', closeExportModal);
+      exportCancel.addEventListener('click', closeExportModal);
+      exportModal.addEventListener('click', function (e) {
+        if (e.target === exportModal) closeExportModal();
+      });
+
+      exportTxtBtn.addEventListener('click', function () {
+        downloadPrompt('text');
+      });
+      exportMdBtn.addEventListener('click', function () {
+        downloadPrompt('markdown');
+      });
+      exportJsonBtn.addEventListener('click', function () {
+        downloadPrompt('json');
+      });
+
+      function downloadPrompt(format) {
+        var text = currentResult ? currentResult.optimized_prompt : '';
+        if (!text) return;
+
+        var filename = 'optimized-prompt';
+        var blobContent = '';
+        var mimeType = 'text/plain';
+        var fileExt = 'txt';
+
+        if (format === 'markdown') {
+          blobContent = '# Optimized Prompt\n\n' + text + '\n\n## Metadata\n' +
+            '- **Target Model**: ' + (state.target || 'generic') + '\n' +
+            '- **Style**: ' + (state.style || 'balanced') + '\n' +
+            '- **Quality**: ' + (state.quality || 'standard') + '\n' +
+            '- **Exported At**: ' + new Date().toLocaleString() + '\n';
+          mimeType = 'text/markdown';
+          fileExt = 'md';
+        } else if (format === 'text') {
+          blobContent = text;
+          mimeType = 'text/plain';
+          fileExt = 'txt';
+        } else if (format === 'json') {
+          var matches = text.match(PLACEHOLDER_REGEX) || [];
+          var variables = Array.from(new Set(matches));
+          var data = {
+            prompt: text,
+            variables: variables,
+            metadata: {
+              target: state.target,
+              style: state.style,
+              quality: state.quality,
+              timestamp: Date.now()
+            }
+          };
+          blobContent = JSON.stringify(data, null, 2);
+          mimeType = 'application/json';
+          fileExt = 'json';
+        }
+
+        var blob = new Blob([blobContent], { type: mimeType });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename + '.' + fileExt;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        closeExportModal();
+      }
+
+      // ---------- Refine prompt (Phase 5) ----------
+      var refineContainer = document.getElementById('refineContainer');
+      var refineInput = document.getElementById('refineInput');
+      var refineSubmitBtn = document.getElementById('refineSubmitBtn');
+
+      function toggleRefineRow() {
+        if (status !== 'done' || !currentResult) return;
+        var isHidden = refineContainer.style.display === 'none';
+        refineContainer.style.display = isHidden ? 'flex' : 'none';
+        if (isHidden) {
+          refineInput.focus();
+        }
+      }
+
+      refineSubmitBtn.addEventListener('click', applyRefinement);
+      refineInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          applyRefinement();
+        }
+      });
+
+      function applyRefinement() {
+        var instruction = refineInput.value.trim();
+        if (!instruction || status !== 'done' || !currentResult) return;
+
+        refineSubmitBtn.disabled = true;
+        refineSubmitBtn.textContent = 'Refining…';
+        refineInput.disabled = true;
+
+        var payload = {
+          prompt: rawPrompt.value.trim(),
+          previous_prompt: currentResult.optimized_prompt,
+          refinement_instruction: instruction,
+          ...providerFields()
+        };
+
+        fetch('/api/optimize-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function (res) {
+            return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+          })
+          .then(function (result) {
+            var data = result.data;
+            if (!data || !data.ok) throw new Error((data && data.error) || 'Refinement failed.');
+            
+            currentResult = data;
+            renderPretty(data.optimized_prompt);
+            rawView.textContent = data.optimized_prompt || '';
+            outlineExpanded = {};
+            outlineExpandAll = false;
+            renderOutline();
+
+            setActiveView('pretty');
+            renderOutputBody();
+
+            refineInput.value = '';
+            refineContainer.style.display = 'none';
+
+            saved = false;
+            libraryEntryId = null;
+            saveBtn.classList.remove('saved');
+            saveBtn.textContent = '☆ Save';
+
+            recordHistory(rawPrompt.value.trim(), {
+              style: 'refined',
+              quality: state.quality,
+              target: state.target,
+              techniques: state.techniques.slice()
+            }, data);
+          })
+          .catch(function (err) {
+            alert((err && err.message) || 'Refinement failed.');
+          })
+          .then(function () {
+            refineSubmitBtn.disabled = false;
+            refineSubmitBtn.textContent = 'Refine';
+            refineInput.disabled = false;
+          });
+      }
+
+      // ---------- Feedback modal (Phase 6) ----------
+      var feedbackLink = document.getElementById('feedbackLink');
+      var feedbackModal = document.getElementById('feedbackModal');
+      var feedbackClose = document.getElementById('feedbackClose');
+      var feedbackCancel = document.getElementById('feedbackCancel');
+      var feedbackSend = document.getElementById('feedbackSend');
+      var feedbackMessage = document.getElementById('feedbackMessage');
+      var feedbackEmail = document.getElementById('feedbackEmail');
+      var feedbackError = document.getElementById('feedbackError');
+
+      feedbackLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        openFeedbackModal();
+      });
+
+      function openFeedbackModal() {
+        feedbackModal.classList.add('open');
+        feedbackModal.setAttribute('aria-hidden', 'false');
+        feedbackMessage.value = '';
+        feedbackEmail.value = '';
+        setFeedbackError('');
+      }
+
+      function closeFeedbackModal() {
+        feedbackModal.classList.remove('open');
+        feedbackModal.setAttribute('aria-hidden', 'true');
+      }
+
+      feedbackClose.addEventListener('click', closeFeedbackModal);
+      feedbackCancel.addEventListener('click', closeFeedbackModal);
+      feedbackModal.addEventListener('click', function (e) {
+        if (e.target === feedbackModal) closeFeedbackModal();
+      });
+
+      function setFeedbackError(msg) {
+        feedbackError.textContent = msg || '';
+        feedbackError.style.display = msg ? 'block' : 'none';
+      }
+
+      feedbackSend.addEventListener('click', function () {
+        var msg = feedbackMessage.value.trim();
+        var emailVal = feedbackEmail.value.trim();
+        if (!msg) {
+          setFeedbackError('Please enter a feedback message.');
+          return;
+        }
+
+        setFeedbackError('');
+        feedbackSend.disabled = true;
+        feedbackSend.textContent = 'Sending…';
+
+        fetch('https://formspree.io/f/mpqgbonn', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            message: msg,
+            email: emailVal
+          })
+        })
+          .then(function (res) {
+            if (res.ok) {
+              alert('Thanks — feedback sent');
+              closeFeedbackModal();
+            } else {
+              throw new Error('Feedback submission failed.');
+            }
+          })
+          .catch(function (err) {
+            setFeedbackError((err && err.message) || 'Submission failed. Try again.');
+          })
+          .then(function () {
+            feedbackSend.disabled = false;
+            feedbackSend.textContent = 'Send feedback';
           });
       });
 
