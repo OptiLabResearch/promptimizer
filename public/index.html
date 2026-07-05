@@ -2258,50 +2258,76 @@
       }
 
       // ---------- Outline (5a) ----------
-      // The backend does not yet return structured per-section outline data
-      // ({name, summary, promptText, rationale}) — it returns a markdown
-      // `optimized_prompt` and a bullet-list `explanation` string. Per
-      // PHASES.md Phase 4, the outline is built here from a hardcoded
-      // fixture (matching the 5a mockup content) until the backend adds
-      // that structure.
+      // Per-section rows are derived from the real result: section name +
+      // prompt text come from the `optimized_prompt` markdown's '## ' headers
+      // (same parser as renderPretty); the rationale/summary come from the
+      // `explanation` bullet list, where each bullet is required (see
+      // buildOptimizePrompt in optimizer.js) to start with the bold section
+      // name it applies to, e.g. "**Role**: ...".
       var OUTLINE_FIXTURE = [
         {
-          name: 'Role',
-          summary: 'Defined the model as an expert AI tech journalist for a professional, analytical tone.',
-          promptText: 'You are an expert AI technology journalist known for clear, analytical, and unbiased reporting.',
-          rationale: 'An unassigned role leaves tone and expertise level to chance — naming it locks in a consistent voice.'
-        },
-        {
-          name: 'Task',
-          summary: 'Told the model exactly how to find, filter and present the news.',
-          promptText: '1. Use your web search tool to retrieve the most significant AI news from the past 7 days.\n2. Filter to the top 3–5 most impactful stories.\n3. Synthesize into a structured digest.',
-          rationale: 'Vague asks produce vague answers — the explicit search → filter → synthesize steps stop the model from dumping unfiltered, outdated results.'
-        },
-        {
-          name: 'Context',
-          summary: 'Explained why recency and accuracy matter, so the model curates instead of dumping.',
-          promptText: 'This digest is read by busy engineers who need only the highest-signal developments, not a raw feed.',
-          rationale: 'Giving the model a reason for the constraints helps it apply judgment on borderline cases instead of following rules mechanically.'
-        },
-        {
-          name: 'Constraints',
-          summary: 'Added an anti-hallucination fallback and required a source for every news item.',
-          promptText: 'Every item must cite a source URL. If fewer than 3 credible stories exist, say so instead of inventing content.',
-          rationale: 'Open-ended news requests are a common hallucination trigger; an explicit fallback instruction is cheaper than a wrong answer.'
-        },
-        {
-          name: 'Output format',
-          summary: 'Set a strict markdown template — category, source and a 3-bullet summary per story.',
-          promptText: '## [Story title]\n**Category:** ...  **Source:** [url]\n- Bullet 1\n- Bullet 2\n- Bullet 3',
-          rationale: 'A fixed template makes the output scannable and lets downstream tooling parse it reliably.'
+          name: 'Optimized prompt',
+          summary: 'The model did not return labeled sections for this result.',
+          promptText: '',
+          rationale: 'See the explanation summary above for what changed.'
         }
       ];
+
+      function parseExplanationBullets(text) {
+        var bullets = [];
+        if (!text) return bullets;
+        text.split('\n').forEach(function (rawLine) {
+          var line = rawLine.trim();
+          if (!line) return;
+          // Bullets are usually "- **Name**: text" but the model sometimes
+          // omits the leading "-"/"*" marker, so strip it if present rather
+          // than requiring it.
+          var listMarker = line.match(/^[-*]\s+(.*)$/);
+          var content = listMarker ? listMarker[1].trim() : line;
+          var match = content.match(/^\*\*(.+?)\*\*:?\s*(.*)$/);
+          if (match) {
+            bullets.push({ name: match[1].trim(), text: match[2].trim() });
+          } else {
+            bullets.push({ name: 'General', text: content });
+          }
+        });
+        return bullets;
+      }
+
+      function buildOutlineSections(result) {
+        var text = String((result && result.optimized_prompt) || '');
+        var headerRe = /^##\s+(.+)$/gm;
+        var rawSections = [];
+        var m;
+        while ((m = headerRe.exec(text)) !== null) {
+          rawSections.push({ title: m[1].trim(), start: headerRe.lastIndex });
+        }
+        if (!rawSections.length) return null;
+
+        var bullets = parseExplanationBullets(result && result.explanation);
+
+        return rawSections.map(function (sec, i) {
+          var end = findSectionEnd(text, rawSections, i);
+          var promptText = text.slice(sec.start, end).trim();
+          var matches = bullets.filter(function (b) {
+            var a = b.name.toLowerCase();
+            var t = sec.title.toLowerCase();
+            return a.indexOf(t) !== -1 || t.indexOf(a) !== -1;
+          });
+          var rationale = matches.length
+            ? matches.map(function (b) { return b.text; }).join(' ')
+            : 'No specific rationale was called out for this section.';
+          var summary = rationale.length > 120 ? rationale.slice(0, 117) + '…' : rationale;
+          return { name: sec.title, summary: summary, promptText: promptText, rationale: rationale };
+        });
+      }
 
       var outlineExpanded = {}; // rowIndex -> bool
       var outlineExpandAll = false;
 
       function renderOutline() {
         outlineView.innerHTML = '';
+        var sections = (currentResult && buildOutlineSections(currentResult)) || OUTLINE_FIXTURE;
 
         if (currentResult && currentResult.explanation) {
           var summaryCard = document.createElement('div');
@@ -2323,14 +2349,14 @@
         var meta = document.createElement('div');
         meta.className = 'outline-meta';
         var metaLeft = document.createElement('span');
-        metaLeft.textContent = OUTLINE_FIXTURE.length + ' sections enhanced · expand a row for details';
+        metaLeft.textContent = sections.length + ' sections enhanced · expand a row for details';
         var metaToggle = document.createElement('button');
         metaToggle.type = 'button';
         metaToggle.className = 'outline-expand-all';
         metaToggle.textContent = outlineExpandAll ? 'Collapse all' : 'Expand all';
         metaToggle.addEventListener('click', function () {
           outlineExpandAll = !outlineExpandAll;
-          OUTLINE_FIXTURE.forEach(function (_, i) { outlineExpanded[i] = outlineExpandAll; });
+          sections.forEach(function (_, i) { outlineExpanded[i] = outlineExpandAll; });
           renderOutline();
         });
         meta.appendChild(metaLeft);
@@ -2340,7 +2366,7 @@
         var list = document.createElement('div');
         list.className = 'outline-list';
 
-        OUTLINE_FIXTURE.forEach(function (section, i) {
+        sections.forEach(function (section, i) {
           var isOpen = !!outlineExpanded[i];
 
           var row = document.createElement('div');
@@ -2437,6 +2463,7 @@
       }
 
       function recordHistory(promptText, options, result) {
+        if (!promptText || !promptText.trim()) return;
         var list = readList(HISTORY_KEY);
         list.push({
           input: promptText,
@@ -3056,8 +3083,13 @@
 
       function renderHistory() {
         var items = readList(HISTORY_KEY);
+        var cleaned = items.filter(function (item) { return item && item.input && item.input.trim(); });
+        if (cleaned.length !== items.length) {
+          writeList(HISTORY_KEY, cleaned);
+          items = cleaned;
+        }
         libraryList.innerHTML = '';
-        
+
         if (items.length === 0) {
           var empty = document.createElement('div');
           empty.className = 'history-empty';
