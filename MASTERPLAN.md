@@ -185,20 +185,14 @@ One primary action per state (Fable's rule): Optimize → Test Both / Copy.
   `length` field in the body, confirming the request doesn't error out.
 
 ### Phase 2 — Core redesign (the new layout)
-1. **Single-column transform layout** (fable/glm-v2 hybrid): input state → result state with
-   collapsing context bar, fade/rise animations, reduced-motion safe.
-2. **Sectioned output**: have the optimizer return labeled sections (Role/Context/Task/
-   Constraints/Format — it already largely writes this structure); render as color-coded
-   accordions with per-section copy and inline "why this changed" annotations (merge the
-   existing explanation output into per-section notes where possible).
-3. **Placeholder fill flow with gating**: chips → inline inputs → Copy disabled (with
-   "copy anyway" escape hatch) until filled or dismissed; compiled prompt is what gets copied.
-4. **Variable sandbox** (Gemini's idea, cheap version): when `{{vars}}` exist, show a small
-   "test values" form + compiled preview.
-5. **Inline edit** of the result (contenteditable per section) without re-running.
-6. **Diff view polish**: keep existing word-diff; add per-section framing so it doesn't
-   become its own wall of text.
-7. **Token estimate** under input and result (chars/4 heuristic is fine).
+1. ✅ **Single-column transform layout** (fable/glm-v2 hybrid): input state → result state with collapsing context bar, fade/rise animations, reduced-motion safe. Single column centered at `800px` width.
+2. ✅ **Sectioned output**: optimizer returns labeled sections (Role, Context, Task, Constraints, Output Format); rendered as color-coded accordions with left-border styling, per-section inline "Why this changed" notes.
+3. ✅ **Placeholder fill flow with gating**: highlights `{{variable}}`/`[UPPERCASE]` placeholders, wraps them in interactive input chips. Copy button disabled (with "copy raw anyway" bypass link) until all placeholders filled.
+4. ✅ **Variable sandbox**: variables sandbox central form inputs that automatically update templates reactively, with a collapsible live compiled preview.
+5. ✅ **Inline edit**: results are editable directly in-page via `contenteditable="true"` on section bodies (chips are uneditable tags). Focus/blur safely rebuilds prompt templates and synchronizes values.
+6. ✅ **Diff view polish**: compute word-diff results partitioned per section so differences are viewed locally inside each accordion.
+7. ✅ **Token estimate**: characters / 4 token heuristics added under the input and result boxes.
+
 
 ### Phase 3 — Retention & conversion features
 1. **Library** (upgrade of existing History, still localStorage — no accounts):

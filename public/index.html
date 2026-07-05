@@ -878,6 +878,313 @@
             color: var(--text-primary);
             box-shadow: none;
         }
+
+        /* --- Phase 2: Single Column & Accordion Styles --- */
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 2.5rem auto;
+            padding: 0 2rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .context-bar {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .context-info {
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .context-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .context-snippet {
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .context-meta {
+            display: flex;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .context-meta-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.65rem;
+            border-radius: 20px;
+            background: rgba(139, 92, 246, 0.06);
+            color: var(--accent-purple);
+            border: 1px solid rgba(139, 92, 246, 0.1);
+        }
+
+        .gate {
+            display: none;
+            margin-bottom: 1.25rem;
+            border: 1px solid #EAD9BF;
+            background: rgba(253, 243, 231, 0.9);
+            border-radius: 12px;
+            padding: 0.85rem 1.25rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #b45309;
+            align-items: center;
+            gap: 0.75rem;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .gate.done {
+            border-color: #CBE7DB;
+            background: rgba(234, 246, 241, 0.9);
+            color: #0e8a62;
+        }
+        .gate .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            flex: none;
+        }
+        .gate-link {
+            color: inherit;
+            text-decoration: underline;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .sect {
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.8);
+            margin-bottom: 0.75rem;
+            overflow: hidden;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sect:hover {
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+            border-color: rgba(15, 23, 42, 0.15);
+        }
+        .sect.open {
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+            background: #fff;
+        }
+
+        /* Section-specific border colors */
+        .sect-role { border-left: 4px solid #3b82f6; }
+        .sect-context { border-left: 4px solid #10b981; }
+        .sect-task { border-left: 4px solid #6366f1; }
+        .sect-constraints { border-left: 4px solid #f59e0b; }
+        .sect-output-format { border-left: 4px solid #ec4899; }
+        .sect-general { border-left: 4px solid var(--text-secondary); }
+
+        .sect-h {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1.1rem 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            outline: none;
+        }
+        .sect-h:hover {
+            background: rgba(15, 23, 42, 0.01);
+        }
+        .sect-h .num {
+            font-family: monospace;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+        .sect-h .ttl {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex-grow: 1;
+        }
+        .sect-h .chev {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            transition: transform 0.2s ease;
+        }
+        .sect.open .sect-h .chev {
+            transform: rotate(90deg);
+        }
+
+        .sect-b {
+            display: none;
+            padding: 0.25rem 1.5rem 1.5rem 2.5rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            word-break: break-word;
+            outline: none;
+            border-radius: 0 0 14px 14px;
+            transition: background-color 0.2s ease;
+        }
+        .sect-b:focus {
+            background-color: rgba(139, 92, 246, 0.01);
+        }
+
+        .sect-note {
+            float: right;
+            max-width: 260px;
+            margin: 0 0 1rem 1.5rem;
+            padding: 0.85rem 1rem;
+            background: rgba(16, 185, 129, 0.05);
+            border-left: 3px solid var(--success-green);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            color: #065f46;
+            border-radius: 0 8px 8px 0;
+        }
+        .sect-note b {
+            display: block;
+            font-weight: 700;
+            color: var(--success-green);
+            margin-bottom: 0.25rem;
+        }
+
+        /* Interactive placeholder chips styling */
+        .placeholder-chip {
+            background: rgba(180, 83, 9, 0.12);
+            color: #92400e;
+            border: 1px dashed rgba(180, 83, 9, 0.35);
+            border-radius: 6px;
+            padding: 0.1em 0.45em;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            vertical-align: middle;
+            user-select: none;
+        }
+        .placeholder-chip:hover {
+            background: rgba(180, 83, 9, 0.18);
+            border-color: rgba(180, 83, 9, 0.6);
+        }
+        .placeholder-chip.filled {
+            background: rgba(16, 185, 129, 0.08);
+            color: #065f46;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            font-family: monospace;
+        }
+        .placeholder-chip.editing {
+            padding: 0;
+            border-style: solid;
+            background: #fff;
+        }
+        .placeholder-input {
+            border: none;
+            background: transparent;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            width: 180px;
+            padding: 0.1rem 0.4rem;
+            outline: none;
+        }
+
+        /* Sandbox section styling */
+        .sandbox-section {
+            margin-top: 2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 1.75rem;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .sandbox-section h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sandbox-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        @media (max-width: 600px) {
+            .sandbox-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .sandbox-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .sandbox-field label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sandbox-field input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 0.6rem 0.85rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+        .sandbox-preview-wrapper {
+            margin-top: 1.25rem;
+            border-top: 1px solid var(--card-border);
+            padding-top: 0.75rem;
+        }
+        .sandbox-preview {
+            background: rgba(15, 23, 42, 0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            margin-top: 0.5rem;
+            max-height: 250px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -892,8 +1199,18 @@
     </header>
 
     <div class="container">
+        <!-- Input Context Bar (Summary) -->
+        <div id="inputContextBar" class="context-bar" style="display: none;">
+            <div class="context-info">
+                <div class="context-title">Raw Prompt Template</div>
+                <div class="context-snippet" id="contextSnippet"></div>
+            </div>
+            <div class="context-meta" id="contextMeta"></div>
+            <button class="copy-btn" onclick="restoreInputState()"><span class="btn-icon">✏️</span> Edit Input</button>
+        </div>
+
         <!-- Input Panel -->
-        <div class="panel">
+        <div class="panel" id="inputPanel">
             <h2><span class="icon">📝</span> Raw Input Prompt</h2>
             <textarea id="rawPrompt" maxlength="30000" placeholder="Paste your raw, simple, or draft prompt here... (e.g. 'write a story about a futuristic gardener')"></textarea>
             <div id="charCount" style="text-align: right; font-size: 0.75rem; color: var(--text-secondary); margin-top: -0.5rem;">0 / 30,000</div>
@@ -966,7 +1283,7 @@
         </div>
 
         <!-- Output Panel -->
-        <div class="panel">
+        <div class="panel" id="resultPanel" style="display: none;">
             <h2><span class="icon">🚀</span> Optimized Result</h2>
 
             <div class="delta-bar" id="deltaBar" style="display: none;">
@@ -974,6 +1291,12 @@
                 <button class="delta-toggle" id="deltaToggle" onclick="toggleDelta()" aria-expanded="false" aria-controls="explanationSection">
                     <span class="chevron">▶</span> <span>Why this is better</span>
                 </button>
+            </div>
+
+            <!-- Placeholder Gating Banner -->
+            <div class="gate" id="gateBar">
+                <span class="dot"></span>
+                <span id="gateText"></span>
             </div>
 
             <div class="output-container">
@@ -988,6 +1311,18 @@
             <div class="explanation-section" id="explanationSection" style="display: none;">
                 <h2><span class="icon">💡</span> Enhancements Made</h2>
                 <div class="explanation-card" id="explanationText"></div>
+            </div>
+
+            <!-- Variable Sandbox Section -->
+            <div class="sandbox-section" id="sandboxSection" style="display: none;">
+                <h3><span class="icon">🧪</span> Variable Sandbox</h3>
+                <div class="sandbox-grid" id="sandboxGrid"></div>
+                <div class="sandbox-preview-wrapper">
+                    <button class="delta-toggle" id="sandboxPreviewToggle" onclick="toggleSandboxPreview()" aria-expanded="false" aria-controls="sandboxPreview">
+                        <span class="chevron">▶</span> <span>Show Compiled Preview</span>
+                    </button>
+                    <div class="sandbox-preview" id="sandboxPreview" style="display: none;"></div>
+                </div>
             </div>
 
             <div class="refine-section" id="refineSection" style="display: none;">
@@ -1194,7 +1529,9 @@
             const promptErrorEl = document.getElementById("promptError");
             const optimizeBtn = document.getElementById("optimizeBtn");
             const updateCharCount = () => {
-                charCountEl.innerText = `${rawPromptEl.value.length.toLocaleString()} / 30,000`;
+                const len = rawPromptEl.value.length;
+                const tokens = Math.ceil(len / 4);
+                charCountEl.innerText = `${len.toLocaleString()} characters · ~${tokens.toLocaleString()} tokens`;
                 const hasText = rawPromptEl.value.trim().length > 0;
                 optimizeBtn.disabled = !hasText;
                 if (hasText) promptErrorEl.classList.remove("show");
@@ -1248,11 +1585,11 @@
             const rawPrompt = document.getElementById("rawPrompt").value.trim();
             const strength = document.getElementById("strength").value;
             const targetModel = document.getElementById("targetModel").value;
+            const lengthSetting = document.getElementById("length").value || "standard";
             const btn = document.getElementById("optimizeBtn");
             const btnText = document.getElementById("btnText");
             const loader = document.getElementById("loader");
             const outputBox = document.getElementById("outputBox");
-            const expSection = document.getElementById("explanationSection");
 
             const promptErrorEl = document.getElementById("promptError");
             if (!rawPrompt) {
@@ -1261,14 +1598,34 @@
             }
             promptErrorEl.classList.remove("show");
 
+            // Populate and show context bar
+            document.getElementById("contextSnippet").innerText = rawPrompt;
+            const targetName = targetModel ? (targetModel.charAt(0).toUpperCase() + targetModel.slice(1)) : "Generic";
+            const lengthName = lengthSetting.charAt(0).toUpperCase() + lengthSetting.slice(1);
+            document.getElementById("contextMeta").innerHTML = `
+                <span class="context-meta-badge">${targetName}</span>
+                <span class="context-meta-badge">${lengthName}</span>
+            `;
+
+            // Swap screens
+            document.getElementById("inputPanel").style.display = "none";
+            document.getElementById("inputContextBar").style.display = "flex";
+            document.getElementById("resultPanel").style.display = "flex";
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: "smooth" });
+
             btn.disabled = true;
             btnText.innerText = "Optimizing...";
             loader.style.display = "block";
-            outputBox.innerHTML = `<div id="streamingText" style="white-space: pre-wrap; color: var(--text-secondary); font-style: italic;"></div>`;
-            expSection.style.display = "none";
+            outputBox.innerHTML = `
+                <div class="output-placeholder" style="flex-direction: column;">
+                    <span class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px; margin-bottom: 1rem;"></span>
+                    <div style="font-weight: 500;">Analyzing and structuring your prompt...</div>
+                </div>
+            `;
 
             const requestBody = buildOptimizeRequestBody(rawPrompt, strength, targetModel);
-            const streamingTextEl = document.getElementById("streamingText");
 
             try {
                 if (requestBody.depth === "deep") {
@@ -1289,11 +1646,13 @@
                 let sawAnyText = false;
                 await consumeSseResponse(response, (event, data) => {
                     if (event === "chunk") {
-                        sawAnyText = true;
-                        streamingTextEl.style.color = "var(--text-primary)";
-                        streamingTextEl.style.fontStyle = "normal";
+                        if (!sawAnyText) {
+                            sawAnyText = true;
+                            outputBox.innerHTML = `<div id="streamingText" style="white-space: pre-wrap; font-family: monospace; font-size: 0.9rem; line-height: 1.6; color: var(--text-primary);"></div>`;
+                        }
+                        const streamingTextEl = document.getElementById("streamingText");
                         streamingTextEl.textContent += data.text;
-                        streamingTextEl.parentElement.scrollTop = streamingTextEl.parentElement.scrollHeight;
+                        outputBox.scrollTop = outputBox.scrollHeight;
                     } else if (event === "done") {
                         doneData = data;
                     } else if (event === "error") {
@@ -1347,7 +1706,6 @@
                                 <div><strong>Optimization Failed:</strong> ${escapeHtml(fallbackErr.message)}</div>
                             </div>
                         `;
-                        expSection.style.display = "none";
                     }
                 } else {
                     outputBox.innerHTML = `
@@ -1356,7 +1714,6 @@
                             <div><strong>Optimization Failed:</strong> ${escapeHtml(err.message)}</div>
                         </div>
                     `;
-                    expSection.style.display = "none";
                 }
             } finally {
                 btn.disabled = false;
@@ -1367,12 +1724,24 @@
 
         let currentRawPrompt = "";
         let currentOptimizedText = "";
+        let currentExplanationText = "";
         let diffModeOn = false;
+        let currentSections = [];
+        let currentPlaceholders = [];
+        let placeholderValues = {};
+        let warningDismissed = false;
+
+        function restoreInputState() {
+            document.getElementById("inputPanel").style.display = "flex";
+            document.getElementById("inputContextBar").style.display = "none";
+            document.getElementById("resultPanel").style.display = "none";
+            document.getElementById("inputPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+            document.getElementById("rawPrompt").focus();
+        }
 
         function renderOptimizedResult(optimizedText, explanationText, model, rawPromptForDiff) {
             const outputBox = document.getElementById("outputBox");
             const expSection = document.getElementById("explanationSection");
-            const expText = document.getElementById("explanationText");
             const refineSection = document.getElementById("refineSection");
             const testSection = document.getElementById("testSection");
             const testColumns = document.getElementById("testColumns");
@@ -1381,10 +1750,20 @@
             currentRawPrompt = rawPromptForDiff !== undefined ? rawPromptForDiff : document.getElementById("rawPrompt").value;
             diffModeOn = false;
 
-            const placeholderCount = countPlaceholders(currentOptimizedText);
-            const warningHtml = placeholderCount
-                ? `<span class="placeholder-warning">⚠ ${placeholderCount} placeholder${placeholderCount === 1 ? "" : "s"} to fill before copying</span>`
-                : "";
+            // Extract unique placeholders
+            const matches = currentOptimizedText.match(PLACEHOLDER_REGEX) || [];
+            currentPlaceholders = Array.from(new Set(matches));
+            placeholderValues = {};
+            currentPlaceholders.forEach(p => {
+                placeholderValues[p] = "";
+            });
+            warningDismissed = false;
+
+            // Parse sections and explanations
+            currentSections = parseSections(currentOptimizedText);
+            currentExplanationText = explanationText || "";
+
+            const warningHtml = `<span class="placeholder-warning" id="placeholderWarningInActions" style="display: none;"></span>`;
 
             outputBox.innerHTML = `
                 <div class="result-actions">
@@ -1394,17 +1773,21 @@
                     <button class="copy-btn diff-action" onclick="toggleDiffView()"><span class="btn-icon">🔀</span> Diff</button>
                     <button class="copy-btn primary-action test-action" onclick="showTestSection()"><span class="btn-icon">⚖️</span> Test Both</button>
                 </div>
-                <div id="optimizedText" style="font-family: inherit; font-size: inherit; line-height: inherit; color: var(--text-primary);">${highlightPlaceholders(escapeHtml(currentOptimizedText))}</div>
+                <div class="result-stats" id="resultTokenEstimate" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1.25rem; text-align: right;"></div>
+                <div id="accordionContainer">
+                    ${renderSectionsHtml()}
+                </div>
+                <div class="explanation-card" id="explanationCardForGeneral" style="display: none; margin-top: 1rem; background: rgba(139, 92, 246, 0.04); border: 1px solid rgba(139, 92, 246, 0.15); border-left: 4px solid var(--accent-purple); border-radius: 12px; padding: 1rem; font-size: 0.85rem;"></div>
             `;
 
-            if (explanationText) {
-                expText.innerHTML = formatExplanation(explanationText);
-            } else {
-                expText.innerHTML = "";
-            }
-            document.getElementById("deltaToggle").setAttribute("aria-expanded", "false");
-            expSection.style.display = "none";
-            renderDeltaBar(explanationText, placeholderCount);
+            if (expSection) expSection.style.display = "none";
+            
+            const deltaBar = document.getElementById("deltaBar");
+            if (deltaBar) deltaBar.style.display = "none"; // Handled inline/general now
+
+            updateGateStatus();
+            renderSandbox();
+            updateTokenEstimates();
 
             refineSection.style.display = currentOptimizedText ? "block" : "none";
             testSection.style.display = "none";
@@ -1412,7 +1795,146 @@
             document.getElementById("refineInput").value = "";
         }
 
-        // ---- Placeholder detection ----
+        // ---- Section & Explanation Parsing ----
+        function parseSections(text) {
+            const sectionNames = ["Role", "Context", "Task", "Constraints", "Output Format"];
+            const sections = [];
+            const lines = text.split("\n");
+            let currentName = "General";
+            let currentContent = [];
+
+            for (const line of lines) {
+                const match = line.match(/^##\s*(Role|Context|Task|Constraints|Output\s+Format)\b/i);
+                if (match) {
+                    if (currentContent.length > 0 || currentName !== "General") {
+                        sections.push({
+                            name: currentName,
+                            content: currentContent.join("\n").trim()
+                        });
+                    }
+                    const parsedName = match[1].replace(/\s+/g, ' ').toLowerCase();
+                    currentName = sectionNames.find(s => s.toLowerCase() === parsedName) || match[1];
+                    currentContent = [];
+                } else {
+                    currentContent.push(line);
+                }
+            }
+            if (currentContent.length > 0 || currentName !== "General") {
+                sections.push({
+                    name: currentName,
+                    content: currentContent.join("\n").trim()
+                });
+            }
+            return sections;
+        }
+
+        function parseExplanations(explanationText) {
+            const bulletRegex = /^\s*[-*]\s+(.*)$/gm;
+            const bullets = [];
+            let match;
+            while ((match = bulletRegex.exec(explanationText)) !== null) {
+                bullets.push(match[1].trim());
+            }
+
+            const sectionExplanations = {};
+            const generalExplanations = [];
+
+            for (const bullet of bullets) {
+                const prefixMatch = bullet.match(/^\*\*(Role|Context|Task|Constraints|Output\s+Format|General)\*\*[:\-]?\s*(.*)$/i);
+                if (prefixMatch) {
+                    const secName = prefixMatch[1].replace(/\s+/g, ' ').toLowerCase();
+                    const text = prefixMatch[2].trim();
+                    if (secName === "general") {
+                        generalExplanations.push(text);
+                    } else {
+                        if (!sectionExplanations[secName]) sectionExplanations[secName] = [];
+                        sectionExplanations[secName].push(text);
+                    }
+                } else {
+                    generalExplanations.push(bullet);
+                }
+            }
+
+            return { sectionExplanations, generalExplanations };
+        }
+
+        function renderSectionsHtml() {
+            const { sectionExplanations, generalExplanations } = parseExplanations(currentExplanationText);
+            let html = "";
+            
+            currentSections.forEach((section, idx) => {
+                const secClass = `sect-${section.name.toLowerCase().replace(/\s+/g, '-')}`;
+                const secExplanationBullets = sectionExplanations[section.name.toLowerCase().replace(/\s+/g, ' ')] || [];
+                const isGeneral = section.name === "General";
+
+                let noteHtml = "";
+                if (secExplanationBullets.length > 0) {
+                    noteHtml = `
+                        <div class="sect-note" contenteditable="false">
+                            <b>Why this changed</b>
+                            <ul style="padding-left: 1.1rem; margin: 0; text-align: left;">
+                                ${secExplanationBullets.map(b => `<li>${escapeHtml(b)}</li>`).join("")}
+                            </ul>
+                        </div>
+                    `;
+                }
+
+                const contentHtml = renderPlaceholderChipsHtml(escapeHtml(section.content));
+                const numStr = String(idx + 1).padStart(2, '0');
+
+                if (isGeneral && !section.content) return;
+
+                html += `
+                    <div class="sect ${secClass} open" id="sec-${idx}">
+                        <button class="sect-h" onclick="toggleSectionAccordion(${idx})" aria-expanded="true" aria-controls="sec-body-${idx}">
+                            <span class="num">${numStr}</span>
+                            <span class="ttl">${escapeHtml(section.name)}</span>
+                            <span class="chev">▶</span>
+                        </button>
+                        <div class="sect-b" id="sec-body-${idx}" contenteditable="true" onfocus="onSectionFocus(this)" onblur="onSectionBlur(this, '${escapeHtml(section.name)}')" style="display: block;">
+                            ${noteHtml}
+                            <span class="sect-content-text">${contentHtml}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Display general explanations
+            const card = document.getElementById("explanationCardForGeneral");
+            if (card) {
+                if (generalExplanations.length > 0) {
+                    card.innerHTML = `
+                        <b>💡 Improvements & Analysis:</b>
+                        <ul style="padding-left: 1.25rem; margin-top: 0.5rem; color: var(--text-secondary); margin-bottom: 0;">
+                            ${generalExplanations.map(b => `<li>${formatExplanation(b)}</li>`).join("")}
+                        </ul>
+                    `;
+                    card.style.display = "block";
+                } else {
+                    card.style.display = "none";
+                }
+            }
+
+            return html;
+        }
+
+        function toggleSectionAccordion(idx) {
+            const sec = document.getElementById(`sec-${idx}`);
+            const body = document.getElementById(`sec-body-${idx}`);
+            const btn = sec.querySelector(".sect-h");
+            const open = sec.classList.contains("open");
+            if (open) {
+                sec.classList.remove("open");
+                body.style.display = "none";
+                btn.setAttribute("aria-expanded", "false");
+            } else {
+                sec.classList.add("open");
+                body.style.display = "block";
+                btn.setAttribute("aria-expanded", "true");
+            }
+        }
+
+        // ---- Placeholder Gating & Gating Flows ----
         const PLACEHOLDER_REGEX = /\{\{[^{}]{1,80}\}\}|\[[A-Z][A-Z0-9 _\-]{1,60}\]/g;
 
         function countPlaceholders(text) {
@@ -1425,89 +1947,358 @@
             return escapedText.replace(PLACEHOLDER_REGEX, (m) => `<span class="placeholder-chip">${m}</span>`);
         }
 
-        // ---- Delta bar (enhancements above the fold) ----
-        function countBullets(explanationText) {
-            if (!explanationText) return 0;
-            const matches = explanationText.match(/^\s*[-*]\s+/gm);
-            return matches ? matches.length : 0;
+        function renderPlaceholderChipsHtml(text) {
+            return text.replace(PLACEHOLDER_REGEX, (token) => {
+                const val = placeholderValues[token] || "";
+                const isFilled = val !== "";
+                const displayLabel = isFilled ? val : token;
+                const stateClass = isFilled ? "filled" : "";
+                return `<span class="placeholder-chip interactive ${stateClass}" data-token="${escapeHtml(token)}" data-original="${escapeHtml(token)}" contenteditable="false" tabindex="0" role="button" onclick="activatePlaceholder(event, this)">${escapeHtml(displayLabel)}</span>`;
+            });
         }
 
-        function renderDeltaBar(explanationText, placeholderCount) {
-            const deltaBar = document.getElementById("deltaBar");
-            const deltaChips = document.getElementById("deltaChips");
-            const deltaToggle = document.getElementById("deltaToggle");
-            const bulletCount = countBullets(explanationText);
+        function activatePlaceholder(event, chipEl) {
+            event.stopPropagation();
+            if (chipEl.querySelector('input')) return;
 
-            if (!explanationText && !placeholderCount) {
-                deltaBar.style.display = "none";
+            const token = chipEl.getAttribute('data-token');
+            const currentValue = placeholderValues[token] || "";
+
+            chipEl.innerHTML = "";
+            chipEl.classList.add("editing");
+
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = "placeholder-input";
+            input.value = currentValue;
+            input.placeholder = `Fill ${token}...`;
+            chipEl.appendChild(input);
+            input.focus();
+            input.select();
+
+            const commit = () => {
+                const value = input.value.trim();
+                placeholderValues[token] = value;
+                syncPlaceholderChips(token, value);
+                updateGateStatus();
+                updateSandboxInputs();
+            };
+
+            input.addEventListener("blur", commit);
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    input.blur();
+                } else if (e.key === "Escape") {
+                    input.value = currentValue;
+                    input.blur();
+                }
+            });
+        }
+
+        function syncPlaceholderChips(token, value) {
+            const chips = document.querySelectorAll(`.placeholder-chip[data-token="${CSS.escape(token)}"]`);
+            chips.forEach(chip => {
+                chip.classList.remove("editing");
+                if (value) {
+                    chip.classList.add("filled");
+                    chip.innerText = value;
+                } else {
+                    chip.classList.remove("filled");
+                    chip.innerText = token;
+                }
+            });
+        }
+
+        function updateGateStatus() {
+            const unfilledTokens = currentPlaceholders.filter(token => !placeholderValues[token]);
+            const unfilledCount = unfilledTokens.length;
+
+            const gateBar = document.getElementById("gateBar");
+            const gateText = document.getElementById("gateText");
+            const copyBtn = document.querySelector(".copy-action");
+            const warningHtml = document.getElementById("placeholderWarningInActions");
+
+            if (unfilledCount === 0) {
+                if (gateBar) {
+                    gateBar.style.display = "flex";
+                    gateBar.className = "gate done";
+                    gateText.innerHTML = `<span class="dot"></span> All placeholders filled. The prompt is copy-ready.`;
+                }
+                if (copyBtn) copyBtn.removeAttribute("disabled");
+                if (warningHtml) warningHtml.style.display = "none";
+            } else {
+                if (gateBar) {
+                    if (warningDismissed) {
+                        gateBar.style.display = "none";
+                    } else {
+                        gateBar.style.display = "flex";
+                        gateBar.className = "gate";
+                        gateText.innerHTML = `<span class="dot"></span> ${unfilledCount} placeholder${unfilledCount === 1 ? "" : "s"} need${unfilledCount === 1 ? "s" : ""} input. Click chips or <a href="#" onclick="dismissWarningAndEnableCopy(event)" class="gate-link">copy raw prompt anyway</a>.`;
+                    }
+                }
+                if (warningDismissed) {
+                    if (copyBtn) copyBtn.removeAttribute("disabled");
+                    if (warningHtml) warningHtml.style.display = "none";
+                } else {
+                    if (copyBtn) copyBtn.setAttribute("disabled", "true");
+                    if (warningHtml) {
+                        warningHtml.style.display = "inline-block";
+                        warningHtml.innerText = `⚠ ${unfilledCount} unfilled`;
+                    }
+                }
+            }
+        }
+
+        function dismissWarningAndEnableCopy(event) {
+            if (event) event.preventDefault();
+            warningDismissed = true;
+            updateGateStatus();
+            showToast("Warning bypassed. You can now copy the raw template.");
+        }
+
+        function compilePrompt() {
+            let compiled = currentOptimizedText;
+            for (const [token, value] of Object.entries(placeholderValues)) {
+                if (value) {
+                    const escapedToken = token.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                    compiled = compiled.replace(new RegExp(escapedToken, 'g'), value);
+                }
+            }
+            return compiled;
+        }
+
+        // ---- Variable Sandbox ----
+        function renderSandbox() {
+            const sandboxSection = document.getElementById("sandboxSection");
+            const sandboxGrid = document.getElementById("sandboxGrid");
+
+            if (currentPlaceholders.length === 0) {
+                sandboxSection.style.display = "none";
                 return;
             }
 
-            const chips = [];
-            if (bulletCount) chips.push(`<span class="delta-chip">+${bulletCount} enhancement${bulletCount === 1 ? "" : "s"}</span>`);
-            if (placeholderCount) chips.push(`<span class="delta-chip warning">${placeholderCount} placeholder${placeholderCount === 1 ? "" : "s"} to fill</span>`);
-            deltaChips.innerHTML = chips.join("");
-            deltaToggle.style.display = explanationText ? "flex" : "none";
-            deltaBar.style.display = "block";
+            sandboxSection.style.display = "block";
+            sandboxGrid.innerHTML = currentPlaceholders.map(token => {
+                const val = placeholderValues[token] || "";
+                return `
+                    <div class="sandbox-field">
+                        <label>${escapeHtml(token)}</label>
+                        <input type="text" data-token="${escapeHtml(token)}" value="${escapeHtml(val)}" oninput="onSandboxInput(this)" placeholder="Enter value...">
+                    </div>
+                `;
+            }).join("");
+
+            updateSandboxPreview();
         }
 
-        function toggleDelta() {
-            const toggle = document.getElementById("deltaToggle");
-            const section = document.getElementById("explanationSection");
+        function onSandboxInput(inputEl) {
+            const token = inputEl.getAttribute("data-token");
+            const value = inputEl.value;
+            placeholderValues[token] = value;
+            syncPlaceholderChips(token, value);
+            updateGateStatus();
+            updateSandboxPreview();
+        }
+
+        function updateSandboxInputs() {
+            const inputs = document.querySelectorAll("#sandboxGrid input");
+            inputs.forEach(input => {
+                const token = input.getAttribute("data-token");
+                input.value = placeholderValues[token] || "";
+            });
+            updateSandboxPreview();
+        }
+
+        function updateSandboxPreview() {
+            const previewEl = document.getElementById("sandboxPreview");
+            if (previewEl) {
+                previewEl.innerText = compilePrompt();
+            }
+        }
+
+        function toggleSandboxPreview() {
+            const toggle = document.getElementById("sandboxPreviewToggle");
+            const preview = document.getElementById("sandboxPreview");
             const expanded = toggle.getAttribute("aria-expanded") === "true";
             toggle.setAttribute("aria-expanded", String(!expanded));
-            section.style.display = expanded ? "none" : "block";
+            preview.style.display = expanded ? "none" : "block";
         }
 
-        // ---- Diff view ----
-        const DIFF_WORD_LIMIT = 1500;
+        // ---- Inline Editing handler ----
+        function onSectionFocus(el) {
+            if (diffModeOn) {
+                toggleDiffView();
+            }
+        }
 
-        function computeWordDiff(a, b) {
-            const aw = a.split(/(\s+)/);
-            const bw = b.split(/(\s+)/);
-            const n = aw.length, m = bw.length;
-            const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
-            for (let i = n - 1; i >= 0; i--) {
-                for (let j = m - 1; j >= 0; j--) {
-                    dp[i][j] = aw[i] === bw[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        function onSectionBlur(el, sectionName) {
+            const rawText = getRawTextFromEditable(el);
+            const sec = currentSections.find(s => s.name === sectionName);
+            if (sec) {
+                sec.content = rawText;
+            }
+            currentOptimizedText = rebuildOptimizedTextFromSections();
+
+            const matches = currentOptimizedText.match(PLACEHOLDER_REGEX) || [];
+            const newPlaceholders = Array.from(new Set(matches));
+
+            currentPlaceholders = newPlaceholders;
+            const newValues = {};
+            currentPlaceholders.forEach(p => {
+                newValues[p] = placeholderValues[p] || "";
+            });
+            placeholderValues = newValues;
+
+            // Restore elements inside text
+            const contentTextEl = el.querySelector(".sect-content-text");
+            if (contentTextEl) {
+                contentTextEl.innerHTML = renderPlaceholderChipsHtml(escapeHtml(rawText));
+            } else {
+                // Fallback
+                el.innerHTML = renderPlaceholderChipsHtml(escapeHtml(rawText));
+            }
+
+            updateGateStatus();
+            renderSandbox();
+            updateTokenEstimates();
+        }
+
+        function getRawTextFromEditable(element) {
+            let text = "";
+            const contentEl = element.querySelector(".sect-content-text") || element;
+            
+            for (const node of contentEl.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    text += node.nodeValue;
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.classList.contains('placeholder-chip')) {
+                        text += node.getAttribute('data-original');
+                    } else if (node.tagName === 'BR') {
+                        text += '\n';
+                    } else {
+                        let childText = getRawTextFromEditable(node);
+                        text += childText;
+                        if (node.tagName === 'DIV' || node.tagName === 'P') {
+                            text += '\n';
+                        }
+                    }
                 }
             }
-            let i = 0, j = 0;
-            const ops = [];
-            while (i < n && j < m) {
-                if (aw[i] === bw[j]) { ops.push(["eq", aw[i]]); i++; j++; }
-                else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push(["del", aw[i]]); i++; }
-                else { ops.push(["add", bw[j]]); j++; }
+            return text.replace(/\r\n/g, "\n");
+        }
+
+        function rebuildOptimizedTextFromSections() {
+            return currentSections.map(s => {
+                if (s.name === "General") {
+                    return s.content;
+                } else {
+                    return `## ${s.name}\n${s.content}`;
+                }
+            }).join("\n\n").trim();
+        }
+
+        function updateTokenEstimates() {
+            const text = compilePrompt();
+            const len = text.length;
+            const tokens = Math.ceil(len / 4);
+            const estEl = document.getElementById("resultTokenEstimate");
+            if (estEl) {
+                estEl.innerText = `${len.toLocaleString()} characters · ~${tokens.toLocaleString()} tokens`;
             }
-            while (i < n) { ops.push(["del", aw[i]]); i++; }
-            while (j < m) { ops.push(["add", bw[j]]); j++; }
-            return ops;
+        }
+
+        // ---- Partitioned Diff view ----
+        function getSectionedDiff(rawPrompt, optimizedText) {
+            const ops = computeWordDiff(rawPrompt, optimizedText);
+            const sections = {};
+            currentSections.forEach(s => {
+                sections[s.name] = [];
+            });
+
+            let currentSec = "General";
+            if (!sections[currentSec]) sections[currentSec] = [];
+
+            for (let idx = 0; idx < ops.length; idx++) {
+                const [type, word] = ops[idx];
+
+                if (word.trim() === "##" && idx + 1 < ops.length) {
+                    const w1 = ops[idx + 1][1].trim();
+                    const lowerW1 = w1.toLowerCase();
+
+                    if (lowerW1 === "role" || lowerW1 === "context" || lowerW1 === "task" || lowerW1 === "constraints") {
+                        const matchedSec = currentSections.find(s => s.name.toLowerCase() === lowerW1);
+                        if (matchedSec) {
+                            currentSec = matchedSec.name;
+                            idx++;
+                            continue;
+                        }
+                    } else if (lowerW1 === "output" && idx + 2 < ops.length) {
+                        const w2 = ops[idx + 2][1].trim().toLowerCase();
+                        if (w2 === "format") {
+                            const matchedSec = currentSections.find(s => s.name.toLowerCase() === "output format");
+                            if (matchedSec) {
+                                currentSec = matchedSec.name;
+                                idx += 2;
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                sections[currentSec].push([type, word]);
+            }
+            return sections;
         }
 
         function toggleDiffView() {
-            const box = document.getElementById("optimizedText");
-            if (!box) return;
             diffModeOn = !diffModeOn;
             const btn = document.querySelector(".diff-action");
-            if (!diffModeOn) {
-                box.innerHTML = escapeHtml(currentOptimizedText);
-                if (btn) btn.classList.remove("success");
-                return;
-            }
-            if (btn) btn.classList.add("success");
+
             const aWords = currentRawPrompt.split(/\s+/).length;
             const bWords = currentOptimizedText.split(/\s+/).length;
-            if (aWords > DIFF_WORD_LIMIT || bWords > DIFF_WORD_LIMIT) {
-                box.innerHTML = `<div style="color: var(--text-secondary); font-style: italic; margin-bottom: 1rem;">Diff view isn't available for prompts this long — showing plain text.</div>` + escapeHtml(currentOptimizedText);
-                return;
+
+            if (diffModeOn) {
+                if (btn) btn.classList.add("success");
+
+                if (aWords > DIFF_WORD_LIMIT || bWords > DIFF_WORD_LIMIT) {
+                    showToast("Diff is not available for prompts this long.", true);
+                    diffModeOn = false;
+                    if (btn) btn.classList.remove("success");
+                    return;
+                }
+
+                const sectionedOps = getSectionedDiff(currentRawPrompt, currentOptimizedText);
+
+                currentSections.forEach((section, idx) => {
+                    const bodyEl = document.getElementById(`sec-body-${idx}`);
+                    if (!bodyEl) return;
+                    bodyEl.setAttribute("contenteditable", "false");
+
+                    const contentTextEl = bodyEl.querySelector(".sect-content-text");
+                    if (!contentTextEl) return;
+
+                    const ops = sectionedOps[section.name] || [];
+                    contentTextEl.innerHTML = ops.map(([type, word]) => {
+                        const escaped = escapeHtml(word);
+                        if (type === "eq") return escaped;
+                        if (type === "add") return `<ins class="diff-add">${escaped}</ins>`;
+                        return `<del class="diff-del">${escaped}</del>`;
+                    }).join("");
+                });
+            } else {
+                if (btn) btn.classList.remove("success");
+
+                currentSections.forEach((section, idx) => {
+                    const bodyEl = document.getElementById(`sec-body-${idx}`);
+                    if (!bodyEl) return;
+                    bodyEl.setAttribute("contenteditable", "true");
+
+                    const contentTextEl = bodyEl.querySelector(".sect-content-text");
+                    if (!contentTextEl) return;
+
+                    contentTextEl.innerHTML = renderPlaceholderChipsHtml(escapeHtml(section.content));
+                });
             }
-            const ops = computeWordDiff(currentRawPrompt, currentOptimizedText);
-            box.innerHTML = ops.map(([type, word]) => {
-                const escaped = escapeHtml(word);
-                if (type === "eq") return escaped;
-                if (type === "add") return `<ins class="diff-add">${escaped}</ins>`;
-                return `<del class="diff-del">${escaped}</del>`;
-            }).join("");
         }
 
         // ---- Iterative refinement ----
@@ -1669,6 +2460,20 @@
             setChipGroupValue("lengthChips", entry.length || "standard");
             setChipGroupValue("qualityChips", entry.depth || "standard");
             renderOptimizedResult(entry.optimized || "", entry.explanation || "", entry.model, entry.raw || "");
+
+            // Transition to result state in single-column layout
+            document.getElementById("inputPanel").style.display = "none";
+            document.getElementById("inputContextBar").style.display = "flex";
+            document.getElementById("resultPanel").style.display = "flex";
+            
+            document.getElementById("contextSnippet").innerText = entry.raw || "";
+            const targetName = entry.targetModel ? (entry.targetModel.charAt(0).toUpperCase() + entry.targetModel.slice(1)) : "Generic";
+            const lengthName = (entry.length || "standard").charAt(0).toUpperCase() + (entry.length || "standard").slice(1);
+            document.getElementById("contextMeta").innerHTML = `
+                <span class="context-meta-badge">${targetName}</span>
+                <span class="context-meta-badge">${lengthName}</span>
+            `;
+            window.scrollTo({ top: 0, behavior: "smooth" });
         }
 
         function toggleHistory() {
@@ -1701,7 +2506,7 @@
         }
 
         function copyToClipboard() {
-            const text = currentOptimizedText;
+            const text = compilePrompt();
             navigator.clipboard.writeText(text).then(() => {
                 const copyBtn = document.querySelector(".copy-action");
                 copyBtn.innerHTML = "<span>✓</span> Copied!";

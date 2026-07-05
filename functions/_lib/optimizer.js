@@ -119,9 +119,16 @@ export function buildOptimizePrompt(body, rawPrompt) {
       "with no text before, between, or after them:\n\n" +
       "<optimized_prompt>\n" +
       "The full prompt after applying the requested revision, in markdown format.\n" +
+      "Organized into labeled sections using markdown '##' headers:\n" +
+      "## Role\n" +
+      "## Context\n" +
+      "## Task\n" +
+      "## Constraints\n" +
+      "## Output Format\n" +
       "</optimized_prompt>\n" +
       "<explanation>\n" +
       "A short markdown bullet-point list of what changed and why.\n" +
+      "Each bullet point MUST start with the bold section name it applies to (e.g. '**Role**: ...' or '**General**: ...').\n" +
       "</explanation>";
     const userText =
       `Current optimized prompt:\n${previousPrompt}\n\n` +
@@ -177,10 +184,13 @@ export function buildOptimizePrompt(body, rawPrompt) {
     "1. OUTCOME-FIRST: Define what \"done\" looks like — the expected outcome, success criteria,\n" +
     "   hard constraints, and output shape. Do NOT prescribe step-by-step procedures unless the\n" +
     "   raw prompt shows the exact path itself matters (compliance, fixed pipelines).\n" +
-    "2. STRUCTURED ANATOMY, in this order when sections are warranted:\n" +
-    "   role/identity → tone rules → reference material (delimited & labeled) → task/outcome\n" +
-    "   definition → hard rules → examples → output format contract → the input/query LAST.\n" +
-    "   Only include sections that earn their place; do not pad with empty boilerplate sections.\n" +
+    "2. STRUCTURED ANATOMY: You MUST organize the optimized prompt into these specific labeled sections using markdown '##' headers:\n" +
+    "   ## Role\n" +
+    "   ## Context\n" +
+    "   ## Task\n" +
+    "   ## Constraints\n" +
+    "   ## Output Format\n" +
+    "   Only include sections that are relevant; do not add empty boilerplate sections.\n" + +
     "3. DELIMIT DATA FROM INSTRUCTIONS: any user-supplied data, documents, or variable content\n" +
     "   goes in clearly delimited blocks. Long reference material at the top; the query and\n" +
     "   instructions at the bottom.\n" +
@@ -214,9 +224,16 @@ export function buildOptimizePrompt(body, rawPrompt) {
     "with no text before, between, or after them:\n\n" +
     "<optimized_prompt>\n" +
     "The full, rewritten prompt in markdown format.\n" +
+    "Organized into labeled sections using markdown '##' headers:\n" +
+    "## Role\n" +
+    "## Context\n" +
+    "## Task\n" +
+    "## Constraints\n" +
+    "## Output Format\n" +
     "</optimized_prompt>\n" +
     "<explanation>\n" +
     "A short markdown bullet-point list of the specific improvements you made and why.\n" +
+    "Each bullet point MUST start with the bold section name it applies to (e.g. '**Role**: ...' or '**General**: ...').\n" +
     "</explanation>";
 
   return { systemPrompt, userText: `Raw Prompt to Optimize:\n${rawPrompt}` };
