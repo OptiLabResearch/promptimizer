@@ -123,66 +123,59 @@ const TECHNIQUE_GUIDELINES = {
 
 export class ValidationError extends Error {}
 
-export function buildOptimizePrompt(body, rawPrompt) {
+export function buildRefinementPrompt(body) {
   const previousPrompt = String(body.previous_prompt || "").trim();
   const refinementInstruction = String(body.refinement_instruction || "").trim();
-  if (refinementInstruction.length > 2000) {
-    throw new ValidationError("Refinement instruction too long (max 2,000 characters)");
-  }
-  const isRefinement = Boolean(previousPrompt && refinementInstruction);
+  const systemPrompt =
+    "You are an expert Prompt Engineer. The user has an already-optimized prompt and wants a " +
+    "targeted revision, not a from-scratch rewrite. Apply ONLY the requested change while " +
+    "preserving everything else about the prompt's structure, persona, and intent. " +
+    "When applying the revision, keep the prompt aligned with modern best practice " +
+    "(outcome-first, delimited data, output contract); do not reintroduce step-by-step " +
+    "micromanagement or 'think step by step' boilerplate.\n\n" +
+    "You MUST structure your entire response as exactly these two blocks, in this order,\n" +
+    "with no text before, between, or after them:\n\n" +
+    "<optimized_prompt>\n" +
+    "The full prompt after applying the requested revision, in markdown format.\n" +
+    "Organized into labeled sections using markdown '##' headers:\n" +
+    "## Role\n" +
+    "## Context\n" +
+    "## Task\n" +
+    "## Constraints\n" +
+    "## Output Format\n" +
+    "</optimized_prompt>\n" +
+    "<explanation>\n" +
+    "A short markdown bullet-point list of what changed and why.\n" +
+    "Each bullet point MUST start with the bold section name it applies to (e.g. '**Role**: ...' or '**General**: ...').\n" +
+    "</explanation>";
+  const userText =
+    `Current optimized prompt:\n${previousPrompt}\n\n` +
+    `Requested revision: ${refinementInstruction}`;
+  return { systemPrompt, userText };
+}
 
-  if (isRefinement) {
-    const systemPrompt =
-      "You are an expert Prompt Engineer. The user has an already-optimized prompt and wants a " +
-      "targeted revision, not a from-scratch rewrite. Apply ONLY the requested change while " +
-      "preserving everything else about the prompt's structure, persona, and intent. " +
-      "When applying the revision, keep the prompt aligned with modern best practice " +
-      "(outcome-first, delimited data, output contract); do not reintroduce step-by-step " +
-      "micromanagement or 'think step by step' boilerplate.\n\n" +
-      "You MUST structure your entire response as exactly these two blocks, in this order,\n" +
-      "with no text before, between, or after them:\n\n" +
-      "<optimized_prompt>\n" +
-      "The full prompt after applying the requested revision, in markdown format.\n" +
-      "Organized into labeled sections using markdown '##' headers:\n" +
-      "## Role\n" +
-      "## Context\n" +
-      "## Task\n" +
-      "## Constraints\n" +
-      "## Output Format\n" +
-      "</optimized_prompt>\n" +
-      "<explanation>\n" +
-      "A short markdown bullet-point list of what changed and why.\n" +
-      "Each bullet point MUST start with the bold section name it applies to (e.g. '**Role**: ...' or '**General**: ...').\n" +
-      "</explanation>";
-    const userText =
-      `Current optimized prompt:\n${previousPrompt}\n\n` +
-      `Requested revision: ${refinementInstruction}`;
-    return { systemPrompt, userText };
-  }
+export function buildCritiquePrompt(rawPrompt) {
+  const systemPrompt =
+    "You are an expert Prompt Engineer conducting a critique of a prompt — you do NOT rewrite it.\n" +
+    "Evaluate the user's raw prompt through these four guide-aligned axes, scoring each from 1-10:\n" +
+    "1. Outcome clarity (Is 'done' defined? Are success criteria, hard constraints, and output shape specified outcome-first?)\n" +
+    "2. Structure & delimiting (Is there clear separation of data vs instructions? Is reference material at the top and the query at the bottom?)\n" +
+    "3. Output contract (Is there an enforceable format, explicit schema, template, or strict length limits?)\n" +
+    "4. Robustness (Are there anti-hallucination outs, explicit enums for classifications, and conditional decision rules over absolutes?)\n\n" +
+    "Evaluate through each lens separately. At the end of the evaluation, list the top 3 highest-impact fixes, ordered by expected gain.\n\n" +
+    "You MUST structure your entire response as exactly these two blocks, in this order,\n" +
+    "with no text before, between, or after them:\n\n" +
+    "<optimized_prompt>\n" +
+    "Repeat the user's raw prompt here, verbatim and unchanged.\n" +
+    "</optimized_prompt>\n" +
+    "<explanation>\n" +
+    "A markdown response with the four scores (out of 10) followed by the detailed evaluation through each lens, " +
+    "and ending with the top 3 highest-impact fixes ordered by expected gain. Do not include a rewritten prompt here.\n" +
+    "</explanation>";
+  return { systemPrompt, userText: `Raw Prompt to Optimize:\n${rawPrompt}` };
+}
 
-  const mode = String(body.mode || "").trim().toLowerCase();
-
-  if (mode === "critique") {
-    const systemPrompt =
-      "You are an expert Prompt Engineer conducting a critique of a prompt — you do NOT rewrite it.\n" +
-      "Evaluate the user's raw prompt through these four guide-aligned axes, scoring each from 1-10:\n" +
-      "1. Outcome clarity (Is 'done' defined? Are success criteria, hard constraints, and output shape specified outcome-first?)\n" +
-      "2. Structure & delimiting (Is there clear separation of data vs instructions? Is reference material at the top and the query at the bottom?)\n" +
-      "3. Output contract (Is there an enforceable format, explicit schema, template, or strict length limits?)\n" +
-      "4. Robustness (Are there anti-hallucination outs, explicit enums for classifications, and conditional decision rules over absolutes?)\n\n" +
-      "Evaluate through each lens separately. At the end of the evaluation, list the top 3 highest-impact fixes, ordered by expected gain.\n\n" +
-      "You MUST structure your entire response as exactly these two blocks, in this order,\n" +
-      "with no text before, between, or after them:\n\n" +
-      "<optimized_prompt>\n" +
-      "Repeat the user's raw prompt here, verbatim and unchanged.\n" +
-      "</optimized_prompt>\n" +
-      "<explanation>\n" +
-      "A markdown response with the four scores (out of 10) followed by the detailed evaluation through each lens, " +
-      "and ending with the top 3 highest-impact fixes ordered by expected gain. Do not include a rewritten prompt here.\n" +
-      "</explanation>";
-    return { systemPrompt, userText: `Raw Prompt to Optimize:\n${rawPrompt}` };
-  }
-
+export function buildStandardPrompt(body, rawPrompt) {
   const strength = String(body.strength || "balanced").trim().toLowerCase();
   const guideline = STRENGTH_GUIDELINES[strength] || STRENGTH_GUIDELINES.balanced;
 
@@ -214,7 +207,7 @@ export function buildOptimizePrompt(body, rawPrompt) {
     "   ## Task\n" +
     "   ## Constraints\n" +
     "   ## Output Format\n" +
-    "   Only include sections that are relevant; do not add empty boilerplate sections.\n" + +
+    "   Only include sections that are relevant; do not add empty boilerplate sections.\n" +
     "3. DELIMIT DATA FROM INSTRUCTIONS: any user-supplied data, documents, or variable content\n" +
     "   goes in clearly delimited blocks. Long reference material at the top; the query and\n" +
     "   instructions at the bottom.\n" +
@@ -263,6 +256,26 @@ export function buildOptimizePrompt(body, rawPrompt) {
   return { systemPrompt, userText: `Raw Prompt to Optimize:\n${rawPrompt}` };
 }
 
+export function buildOptimizePrompt(body, rawPrompt) {
+  const previousPrompt = String(body.previous_prompt || "").trim();
+  const refinementInstruction = String(body.refinement_instruction || "").trim();
+  if (refinementInstruction.length > 2000) {
+    throw new ValidationError("Refinement instruction too long (max 2,000 characters)");
+  }
+  const isRefinement = Boolean(previousPrompt && refinementInstruction);
+
+  if (isRefinement) {
+    return buildRefinementPrompt(body);
+  }
+
+  const mode = String(body.mode || "").trim().toLowerCase();
+  if (mode === "critique") {
+    return buildCritiquePrompt(rawPrompt);
+  }
+
+  return buildStandardPrompt(body, rawPrompt);
+}
+
 export function buildRefinePassPrompt(rawPrompt, firstOptimized) {
   const systemPrompt =
     "You are an expert prompt engineer. Critique the following optimized prompt through two lenses:\n" +
@@ -285,22 +298,33 @@ export function buildRefinePassPrompt(rawPrompt, firstOptimized) {
   return { systemPrompt, userText };
 }
 
+function extractTag(text, tagName, fallbackTags) {
+  // Look for exact match with closing tag
+  const closingRegex = new RegExp(`<${tagName}>([\\s\\S]*?)</${tagName}>`, 'i');
+  const match = text.match(closingRegex);
+  if (match) return match[1].trim();
+  
+  // Fallback: look for opening tag, and stop at any of the fallback tags or end of string
+  const fallbacks = fallbackTags.map(t => `<${t}>`).join('|');
+  const fallbackRegex = new RegExp(`<${tagName}>([\\s\\S]*?)(?:${fallbacks}|$)`, 'i');
+  const fallbackMatch = text.match(fallbackRegex);
+  if (fallbackMatch) return fallbackMatch[1].trim();
+  
+  return "";
+}
+
 export function parseDelimitedResponse(rawResponse) {
   let cleanResponse = rawResponse.trim();
 
+  // Strip reasoning blocks case-insensitively
   cleanResponse = cleanResponse
-    .replace(/<(think|thinking|thought|reasoning)>[\s\S]*?<\/\1>/g, "")
+    .replace(/<(think|thinking|thought|reasoning)>[\s\S]*?<\/\1>/gi, "")
     .trim();
 
-  let optimizedText = "";
-  let explanationText = "";
+  let optimizedText = extractTag(cleanResponse, "optimized_prompt", ["explanation"]);
+  let explanationText = extractTag(cleanResponse, "explanation", ["optimized_prompt"]);
 
-  const optMatch = cleanResponse.match(/<optimized_prompt>([\s\S]*?)<\/optimized_prompt>/);
-  if (optMatch) {
-    optimizedText = optMatch[1].trim();
-    const expMatch = cleanResponse.match(/<explanation>([\s\S]*?)<\/explanation>/);
-    explanationText = expMatch ? expMatch[1].trim() : "";
-  } else {
+  if (!optimizedText) {
     let jsonCandidate = cleanResponse;
     if (jsonCandidate.startsWith("```json")) {
       jsonCandidate = jsonCandidate.replace(/^```json/, "").replace(/```$/, "").trim();
@@ -329,16 +353,6 @@ export function parseDelimitedResponse(rawResponse) {
 // Resolves which provider config to use: the caller's own key (BYO, from the
 // request body) takes priority; otherwise fall back to a shared key from
 // environment secrets (only present on the maintainer's hosted instance).
-//
-// The result is `{ attempts, source }`, where `attempts` is an ordered list
-// of `{ mode, baseUrl, apiKey, model }` candidates to try in sequence —
-// falling back to the next attempt on any upstream error (rate limit, 5xx,
-// etc). For BYO keys there's exactly one attempt. For the hosted instance,
-// `HOSTED_PROVIDER` may itself be a comma-separated list of providers (e.g.
-// "nvidia,openrouter"), each contributing its own models (from
-// `HOSTED_MODEL_<PROVIDER>`, or `HOSTED_MODEL` for the first provider, or
-// the provider's default) — so a request can fail over from one model to
-// the next *and* from one provider to the next.
 export function resolveProviderConfig(body, env) {
   const bodyApiKey = String(body.api_key || "").trim();
   const bodyProvider = String(body.provider || "").trim().toLowerCase();
@@ -356,30 +370,41 @@ export function resolveProviderConfig(body, env) {
   }
 
   // No client key supplied — try the server's shared hosted-instance key(s).
-  const sharedProviders = String(env.HOSTED_PROVIDER || "")
+  let sharedProviders = String(env.HOSTED_PROVIDER || "")
     .split(",")
     .map((p) => p.trim().toLowerCase())
     .filter(Boolean);
+
+  if (bodyProvider && bodyProvider !== "custom") {
+    if (sharedProviders.includes(bodyProvider)) {
+      sharedProviders = [bodyProvider];
+    } else {
+      throw new ValidationError(`API key is required for provider "${bodyProvider}".`);
+    }
+  }
 
   const attempts = [];
   sharedProviders.forEach((provider, i) => {
     const preset = PROVIDER_PRESETS[provider];
     if (!preset) return;
-    const key =
-      provider === "nvidia"
-        ? env.NVIDIA_API_KEY
-        : provider === "openrouter"
-          ? env.OPENROUTER_API_KEY
-          : provider === "google"
-            ? env.GOOGLE_API_KEY
-            : undefined;
+
+    // Extensible API Key resolution:
+    // e.g. opencode-go -> env.OPENCODE_GO_API_KEY
+    const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+    const key = env[`${cleanProviderName}_API_KEY`] || 
+                env[`${cleanProviderName}_KEY`] ||
+                (provider === "nvidia" ? env.NVIDIA_API_KEY :
+                 provider === "openrouter" ? env.OPENROUTER_API_KEY :
+                 provider === "google" ? env.GOOGLE_API_KEY : undefined);
+                 
     if (!key) return;
-    const rawModels = env[`HOSTED_MODEL_${provider.toUpperCase()}`] || (i === 0 ? env.HOSTED_MODEL : "");
+
+    const rawModels = env[`HOSTED_MODEL_${cleanProviderName}`] || (i === 0 ? env.HOSTED_MODEL : "");
     const models = String(rawModels || "")
       .split(",")
       .map((m) => m.trim())
       .filter(Boolean);
-    if (!models.length) models.push(preset.defaultModel);
+    if (!models.length && preset.defaultModel) models.push(preset.defaultModel);
     for (const model of models) attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model, provider });
   });
 
@@ -390,189 +415,198 @@ export function resolveProviderConfig(body, env) {
   );
 }
 
-async function callChatCompletionOnce(attempt, systemPrompt, userText, maxTokens) {
-  const resp = await fetch(`${attempt.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${attempt.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: attempt.model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userText },
-      ],
-      temperature: 0.2,
-      max_tokens: maxTokens,
-    }),
-  });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`Upstream provider error (${resp.status}): ${text.slice(0, 300)}`);
+// Request preparation factory helper (DRY)
+function prepareRequest(attempt, systemPrompt, userText, maxTokens, stream = false) {
+  if (attempt.mode === "anthropic") {
+    return {
+      url: `${attempt.baseUrl.replace(/\/$/, "")}/v1/messages`,
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": attempt.apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: {
+        model: attempt.model,
+        ...(systemPrompt ? { system: systemPrompt } : {}),
+        messages: [{ role: "user", content: userText }],
+        max_tokens: maxTokens,
+        ...(stream ? { stream: true } : {}),
+      },
+    };
+  } else {
+    const messages = [];
+    if (systemPrompt) {
+      messages.push({ role: "system", content: systemPrompt });
+    }
+    messages.push({ role: "user", content: userText });
+
+    return {
+      url: `${attempt.baseUrl.replace(/\/$/, "")}/chat/completions`,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${attempt.apiKey}`,
+      },
+      body: {
+        model: attempt.model,
+        messages,
+        temperature: 0.2,
+        max_tokens: maxTokens,
+        ...(stream ? { stream: true } : {}),
+      },
+    };
   }
-  const data = await resp.json();
-  const choice = (data.choices || [])[0] || {};
-  const content = String(choice.message?.content || "").trim();
-  const truncated = String(choice.finish_reason || "") === "length";
-  return { content, truncated };
 }
 
-async function callAnthropicCompletionOnce(attempt, systemPrompt, userText, maxTokens) {
-  const resp = await fetch(`${attempt.baseUrl.replace(/\/$/, "")}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": attempt.apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: attempt.model,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userText }],
-      max_tokens: maxTokens,
-    }),
-  });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`Upstream provider error (${resp.status}): ${text.slice(0, 300)}`);
-  }
-  const data = await resp.json();
-  const content = (data.content || []).map((b) => b.text || "").join("").trim();
-  const truncated = data.stop_reason === "max_tokens";
-  return { content, truncated };
-}
-
-// Tries each attempt (model, possibly from a different provider) in order,
-// falling back to the next one if a request fails (e.g. rate-limited or
-// temporarily unavailable).
-export async function callCompletion(config, systemPrompt, userText, maxTokens = 4000) {
+// Executes connection and retries config.attempts in order, providing robust connection timeouts
+async function executeWithFallback(config, systemPrompt, userText, maxTokens, stream, signal, handler) {
   let lastError;
   for (const attempt of config.attempts) {
+    const controller = new AbortController();
+    let abortHandler;
+    if (signal) {
+      if (signal.aborted) throw new Error("Request aborted");
+      abortHandler = () => controller.abort();
+      signal.addEventListener("abort", abortHandler);
+    }
+    
+    // Connection timeout of 15 seconds. In streaming mode, this is reset for each chunk.
+    let timeoutId = setTimeout(() => controller.abort(), 15000);
+    const resetTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => controller.abort(), 15000);
+    };
+
     try {
-      const result =
-        attempt.mode === "anthropic"
-          ? await callAnthropicCompletionOnce(attempt, systemPrompt, userText, maxTokens)
-          : await callChatCompletionOnce(attempt, systemPrompt, userText, maxTokens);
-      return { ...result, model: attempt.model };
+      const { url, headers, body } = prepareRequest(attempt, systemPrompt, userText, maxTokens, stream);
+      const resp = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => "");
+        throw new Error(`Upstream provider error (${resp.status}): ${text.slice(0, 300)}`);
+      }
+
+      const result = await handler(resp, attempt, resetTimeout, controller.signal);
+      return result;
     } catch (e) {
       lastError = e;
+      if (signal?.aborted) break;
+    } finally {
+      clearTimeout(timeoutId);
+      if (signal && abortHandler) {
+        signal.removeEventListener("abort", abortHandler);
+      }
     }
   }
   throw lastError;
 }
 
-async function streamAnthropicOnce(attempt, systemPrompt, userText, maxTokens, onChunk) {
-  const resp = await fetch(`${attempt.baseUrl.replace(/\/$/, "")}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": attempt.apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: attempt.model,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userText }],
-      max_tokens: maxTokens,
-      stream: true,
-    }),
+export async function callCompletion(config, systemPrompt, userText, maxTokens = 4000, signal = null) {
+  return executeWithFallback(config, systemPrompt, userText, maxTokens, false, signal, async (resp, attempt) => {
+    const data = await resp.json();
+    let content = "";
+    let truncated = false;
+
+    if (attempt.mode === "anthropic") {
+      content = (data.content || []).map((b) => b.text || "").join("").trim();
+      truncated = data.stop_reason === "max_tokens";
+    } else {
+      const choice = (data.choices || [])[0] || {};
+      content = String(choice.message?.content || "").trim();
+      truncated = String(choice.finish_reason || "") === "length";
+    }
+
+    return { content, truncated, model: attempt.model };
   });
-  if (!resp.ok || !resp.body) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`Upstream provider error (${resp.status}): ${text.slice(0, 300)}`);
-  }
-  let truncated = false;
-  for await (const event of iterSseEvents(resp.body)) {
-    let data;
-    try {
-      data = JSON.parse(event.data);
-    } catch (e) {
-      continue;
-    }
-    if (data.type === "content_block_delta" && data.delta?.text) onChunk(data.delta.text);
-    if (data.type === "message_delta" && data.delta?.stop_reason === "max_tokens") truncated = true;
-  }
-  return { truncated };
 }
 
-async function streamChatOnce(attempt, systemPrompt, userText, maxTokens, onChunk) {
-  const resp = await fetch(`${attempt.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${attempt.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: attempt.model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userText },
-      ],
-      temperature: 0.2,
-      max_tokens: maxTokens,
-      stream: true,
-    }),
+export async function streamCompletion(config, systemPrompt, userText, maxTokens = 4000, onChunk, signal = null) {
+  return executeWithFallback(config, systemPrompt, userText, maxTokens, true, signal, async (resp, attempt, resetTimeout, executionSignal) => {
+    if (!resp.body) throw new Error("Response body is null");
+    let truncated = false;
+
+    for await (const event of iterSseEvents(resp.body, executionSignal)) {
+      resetTimeout();
+      if (event.data === "[DONE]") break;
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch (e) {
+        continue;
+      }
+
+      if (attempt.mode === "anthropic") {
+        if (data.type === "content_block_delta" && data.delta?.text) {
+          onChunk(data.delta.text);
+        }
+        if (data.type === "message_delta" && data.delta?.stop_reason === "max_tokens") {
+          truncated = true;
+        }
+      } else {
+        const choice = (data.choices || [])[0];
+        const piece = choice?.delta?.content;
+        if (piece) onChunk(piece);
+        if (String(choice?.finish_reason || "") === "length") {
+          truncated = true;
+        }
+      }
+    }
+
+    return { truncated, model: attempt.model };
   });
-  if (!resp.ok || !resp.body) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`Upstream provider error (${resp.status}): ${text.slice(0, 300)}`);
-  }
-  let truncated = false;
-  for await (const event of iterSseEvents(resp.body)) {
-    if (event.data === "[DONE]") break;
-    let data;
-    try {
-      data = JSON.parse(event.data);
-    } catch (e) {
-      continue;
-    }
-    const choice = (data.choices || [])[0];
-    const piece = choice?.delta?.content;
-    if (piece) onChunk(piece);
-    if (String(choice?.finish_reason || "") === "length") truncated = true;
-  }
-  return { truncated };
 }
 
-// Streams text chunks from the upstream provider, calling onChunk(text) as
-// they arrive. Tries each attempt (model, possibly from a different
-// provider) in order, falling back to the next one if a request fails
-// before any chunk is emitted. Returns { truncated, model }.
-export async function streamCompletion(config, systemPrompt, userText, maxTokens, onChunk) {
-  let lastError;
-  for (const attempt of config.attempts) {
-    try {
-      const result =
-        attempt.mode === "anthropic"
-          ? await streamAnthropicOnce(attempt, systemPrompt, userText, maxTokens, onChunk)
-          : await streamChatOnce(attempt, systemPrompt, userText, maxTokens, onChunk);
-      return { ...result, model: attempt.model };
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  throw lastError;
-}
-
-// Minimal SSE parser for upstream provider streams: yields {event, data} per
-// "data: ..." line block, matching the OpenAI/Anthropic wire format.
-async function* iterSseEvents(body) {
+// Minimal SSE parser: yields {data} per message block. Handles \n\n and \r\n\r\n.
+export async function* iterSseEvents(body, signal) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let idx;
-    while ((idx = buf.indexOf("\n\n")) !== -1) {
-      const raw = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      const dataLines = raw.split("\n").filter((l) => l.startsWith("data:"));
-      if (!dataLines.length) continue;
-      const data = dataLines.map((l) => l.slice(5).trim()).join("\n");
-      yield { data };
+  try {
+    while (true) {
+      if (signal?.aborted) throw new Error("Request aborted");
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      let offset = 0;
+      while (true) {
+        const idx = buf.indexOf("\n\n", offset);
+        let delimiterLen = 2;
+        const crlfIdx = buf.indexOf("\r\n\r\n", offset);
+        let chosenIdx = idx;
+        if (crlfIdx !== -1 && (idx === -1 || crlfIdx < idx)) {
+          chosenIdx = crlfIdx;
+          delimiterLen = 4;
+        }
+        if (chosenIdx === -1) break;
+
+        const raw = buf.slice(offset, chosenIdx);
+        offset = chosenIdx + delimiterLen;
+
+        const dataLines = raw.split(/\r?\n/).filter((l) => l.startsWith("data:"));
+        if (!dataLines.length) continue;
+        const data = dataLines.map((l) => l.slice(5).trim()).join("\n");
+        yield { data };
+      }
+      if (offset > 0) {
+        buf = buf.slice(offset);
+      }
     }
+    buf += decoder.decode();
+    
+    // Yield any remaining unparsed events from the stream termination flush
+    const remaining = buf.trim();
+    if (remaining.length > 0) {
+      const dataLines = remaining.split(/\r?\n/).filter((l) => l.startsWith("data:"));
+      if (dataLines.length) {
+        yield { data: dataLines.map((l) => l.slice(5).trim()).join("\n") };
+      }
+    }
+  } finally {
+    reader.releaseLock();
   }
 }

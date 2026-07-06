@@ -43,7 +43,7 @@ export async function onRequestPost({ request, env }) {
         const { truncated, model } = await streamCompletion(config, systemPrompt, userText, 4000, (piece) => {
           fullText.push(piece);
           send("chunk", { text: piece });
-        });
+        }, request.signal);
         if (truncated) {
           send("error", {
             error: "The model's response was cut off before it finished. Try a shorter prompt or a different model.",
@@ -53,6 +53,7 @@ export async function onRequestPost({ request, env }) {
           send("done", { optimized_prompt: optimizedText, explanation: explanationText, model });
         }
       } catch (e) {
+        if (request.signal?.aborted) return;
         send("error", { error: e.message || "Optimization failed." });
       }
       controller.close();

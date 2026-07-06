@@ -1,7 +1,7 @@
 import { runUnitTests } from "./functions/api/optimize-prompt/test.js";
 
 console.log("Running unit tests...");
-const results = runUnitTests();
+const results = await runUnitTests();
 let allPassed = true;
 for (const r of results) {
   if (r.passed) {

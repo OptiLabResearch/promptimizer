@@ -26,8 +26,14 @@ export async function onRequestPost({ request, env }) {
   }
 
   const rawPrompt = String(body.prompt || "").trim();
-  if (!rawPrompt) return json({ ok: false, error: "prompt is required" }, 400);
-  if (rawPrompt.length > 30000) {
+  const previousPrompt = String(body.previous_prompt || "").trim();
+  const refinementInstruction = String(body.refinement_instruction || "").trim();
+  const isRefinement = Boolean(previousPrompt && refinementInstruction);
+
+  if (!isRefinement && !rawPrompt) {
+    return json({ ok: false, error: "prompt is required" }, 400);
+  }
+  if (rawPrompt.length > 30000 || previousPrompt.length > 30000) {
     return json({ ok: false, error: "Prompt too long (max 30,000 characters)" }, 400);
   }
 
@@ -41,7 +47,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   try {
-    let { content, truncated, model } = await callCompletion(config, systemPrompt, userText);
+    let { content, truncated, model } = await callCompletion(config, systemPrompt, userText, 4000, request.signal);
     if (truncated) {
       return json(
         { ok: false, error: "The model's response was cut off before it finished. Try a shorter prompt or a different model." },
@@ -50,9 +56,9 @@ export async function onRequestPost({ request, env }) {
     }
     let { optimizedText, explanationText } = parseDelimitedResponse(content);
 
-    if (body.depth === "deep") {
+    if (body.depth === "deep" && optimizedText) {
       const refineParams = buildRefinePassPrompt(rawPrompt, optimizedText);
-      const secondResult = await callCompletion(config, refineParams.systemPrompt, refineParams.userText);
+      const secondResult = await callCompletion(config, refineParams.systemPrompt, refineParams.userText, 4000, request.signal);
       if (secondResult.truncated) {
         return json(
           { ok: false, error: "The model's response was cut off during the second critique pass. Try a shorter prompt or a different model." },
