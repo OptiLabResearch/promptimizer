@@ -1,5 +1,7 @@
 # Prompt Optimizer
 
+Live website: https://promptoptimizer.optiqo.dev/
+
 Paste a rough prompt, get back a structured, model-tailored rewrite — with
 chain-of-thought/few-shot/XML technique toggles, per-target-model guidance
 (Claude/GPT/Gemini/local), iterative refinement, a word-diff view, and a

@@ -359,6 +359,9 @@ export function resolveProviderConfig(body, env) {
   const bodyModel = String(body.model || "").trim();
   const bodyBaseUrl = String(body.base_url || "").trim();
 
+  // Set 26-second execution deadline for Cloudflare Pages (30-second max limit)
+  const deadline = Date.now() + 26000;
+
   if (bodyApiKey) {
     const preset = PROVIDER_PRESETS[bodyProvider];
     const mode = preset ? preset.mode : "chat";
@@ -366,7 +369,7 @@ export function resolveProviderConfig(body, env) {
     const model = bodyModel || (preset ? preset.defaultModel : "");
     if (!baseUrl) throw new ValidationError("A base URL is required for a custom provider.");
     if (!model) throw new ValidationError("A model is required.");
-    return { attempts: [{ mode, baseUrl, apiKey: bodyApiKey, model, provider: bodyProvider || "custom" }], source: "byo" };
+    return { attempts: [{ mode, baseUrl, apiKey: bodyApiKey, model, provider: bodyProvider || "custom" }], source: "byo", deadline };
   }
 
   // No client key supplied — try the server's shared hosted-instance key(s).
@@ -408,7 +411,7 @@ export function resolveProviderConfig(body, env) {
     for (const model of models) attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model, provider });
   });
 
-  if (attempts.length) return { attempts, source: "hosted" };
+  if (attempts.length) return { attempts, source: "hosted", deadline };
 
   throw new ValidationError(
     "No API key configured. Add your own key in Settings, or ask the site owner to configure a shared key."
@@ -460,7 +463,15 @@ function prepareRequest(attempt, systemPrompt, userText, maxTokens, stream = fal
 // Executes connection and retries config.attempts in order, providing robust connection timeouts
 async function executeWithFallback(config, systemPrompt, userText, maxTokens, stream, signal, handler) {
   let lastError;
+  const deadline = config.deadline || (Date.now() + 26000);
+
   for (const attempt of config.attempts) {
+    const now = Date.now();
+    if (now >= deadline - 1000) {
+      lastError = new Error("Execution budget exceeded (request timed out)");
+      break;
+    }
+
     const controller = new AbortController();
     let abortHandler;
     if (signal) {
@@ -469,11 +480,19 @@ async function executeWithFallback(config, systemPrompt, userText, maxTokens, st
       signal.addEventListener("abort", abortHandler);
     }
     
-    // Connection timeout of 15 seconds. In streaming mode, this is reset for each chunk.
-    let timeoutId = setTimeout(() => controller.abort(), 15000);
+    // Connection timeout of 15 seconds, or remaining budget, whichever is smaller.
+    const remainingTime = deadline - now;
+    const currentTimeout = Math.min(15000, remainingTime);
+
+    let timeoutId = setTimeout(() => controller.abort(), currentTimeout);
     const resetTimeout = () => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => controller.abort(), 15000);
+      const newRemaining = deadline - Date.now();
+      if (newRemaining <= 0) {
+        controller.abort();
+      } else {
+        timeoutId = setTimeout(() => controller.abort(), newRemaining);
+      }
     };
 
     try {

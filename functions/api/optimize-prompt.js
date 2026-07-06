@@ -57,18 +57,22 @@ export async function onRequestPost({ request, env }) {
     let { optimizedText, explanationText } = parseDelimitedResponse(content);
 
     if (body.depth === "deep" && optimizedText) {
-      const refineParams = buildRefinePassPrompt(rawPrompt, optimizedText);
-      const secondResult = await callCompletion(config, refineParams.systemPrompt, refineParams.userText, 4000, request.signal);
-      if (secondResult.truncated) {
-        return json(
-          { ok: false, error: "The model's response was cut off during the second critique pass. Try a shorter prompt or a different model." },
-          502
-        );
+      try {
+        const refineParams = buildRefinePassPrompt(rawPrompt, optimizedText);
+        const secondResult = await callCompletion(config, refineParams.systemPrompt, refineParams.userText, 4000, request.signal);
+        if (secondResult.truncated) {
+          return json(
+            { ok: false, error: "The model's response was cut off during the second critique pass. Try a shorter prompt or a different model." },
+            502
+          );
+        }
+        const secondParsed = parseDelimitedResponse(secondResult.content);
+        optimizedText = secondParsed.optimizedText;
+        explanationText = secondParsed.explanationText;
+        model = secondResult.model;
+      } catch (refineError) {
+        console.error("Second critique/refinement pass failed, falling back to first-pass result:", refineError);
       }
-      const secondParsed = parseDelimitedResponse(secondResult.content);
-      optimizedText = secondParsed.optimizedText;
-      explanationText = secondParsed.explanationText;
-      model = secondResult.model;
     }
 
     return json({ ok: true, optimized_prompt: optimizedText, explanation: explanationText, model });

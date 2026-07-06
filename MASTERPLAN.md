@@ -468,3 +468,353 @@ traffic/pageviews — it complements but doesn't replace event tracking.
    sections + per-section rationales in its JSON).
 3. Phase 3 only after watching real usage of Test Both and Save — Fable's advice: validate
    the conversion moment cheaply before investing in the bench UI.
+
+---
+
+# 6. Roadmap v2 — Launch → Differentiation (planned 2026-07-06)
+
+Phases 1–3 (quick wins, redesign, retention) are shipped. This section is the forward plan:
+it folds in the remaining Metrics work, the owner's own punch-list, and the second wave of
+LLM/assistant feature reviews, then sorts everything by leverage. Written 2026-07-06; dates
+are targets for a part-time solo maintainer and should slip as a block, not individually.
+
+## 6.0 Prioritisation principle
+
+Order is: **(1) don't ship something broken or unsafe → (2) don't ship something slow or
+confusing → (3) then add reach → (4) then add differentiation.** Concretely:
+
+1. **Launch readiness first** (Phase 4): correctness, security, speed, a baseline of
+   analytics, and the docs a first-time visitor needs. You cannot learn anything from a
+   feedback round run on a buggy/undocumented app.
+2. **Clarity & mobile second** (Phase 5): the owner's UX punch-list. High impact, low risk,
+   makes the feedback round and any sharing actually land.
+3. **Evaluation & quality features** (Phase 6): the "serious tool" wave — scoring, linting,
+   eval suite. This is where reviewers agreed the real value is.
+4. **Novel bets** (Phase 7): the things no competitor has — injection harness, reverse mode,
+   permalinks, ablation, cost-to-pass.
+5. **Platform/distribution** (Phase 8): extension, CLI/API, multimodal — big, opportunistic.
+
+Each item below carries a **SMART goal** (specific, measurable, time-bound), a **Done-when**
+acceptance checklist, a rough **size** (S ≤ half-day, M ≤ 2 days, L ≤ 1 week, XL > 1 week),
+and where relevant the **owner request** it satisfies.
+
+Global quality gate (applies to every item before it's called done): `node run-tests.js`
+green, `/code-review` at medium clean, manual click-through on desktop **and** a real phone
+viewport, no new console errors, no secrets added to client bundle.
+
+---
+
+## Phase 4 — Launch Readiness & Trust  (Sprint 1–2 · target 2026-07-27)
+
+The goal of this phase is a single sentence: **make the app correct, safe, fast, measured,
+and documented enough that asking strangers for feedback is worthwhile.**
+
+### 4.1 Deep code-health + bug sweep — `M` — owner: "deep scan on code cleanness / errors / bugs"
+- **SMART:** By 2026-07-13, run `/code-review high` over the whole working tree and the
+  3,661-line `public/index.html`, fix every Confirmed correctness finding, and reduce the
+  single-file JS to reviewable modules or clearly-sectioned blocks. Zero Confirmed bugs left
+  open at phase end.
+- **Done when:** review report has no open CONFIRMED items; `node run-tests.js` green; no
+  dead handlers/IDs (cross-check every `getElementById` against the DOM); no swallowed
+  errors that hide failures from users.
+- **Notes:** `index.html` is the risk concentration — 3.6k lines of mixed CSS/HTML/JS.
+  Consider extracting the client JS into `public/app.js` (still no build step) to make future
+  reviews tractable. Not required, but recommended before Phase 6 adds more UI.
+
+### 4.2 Security audit — `M` — owner: "security audit"
+- **SMART:** By 2026-07-15, complete a written security pass (run `/security-review`) covering
+  the four real surfaces and close every high/medium finding: (a) BYO API keys in
+  `localStorage` + sent per-request, (b) untrusted model output rendered as HTML in the
+  result pane (XSS via `innerHTML`), (c) the shared-hosted-key fallback in
+  `resolveProviderConfig` (no key leakage, provider allow-list enforced), (d) request-size /
+  abuse limits on the Pages Functions.
+- **Done when:** all rendered model output is sanitized or inserted as text (audit every
+  `innerHTML`/template-string-into-DOM path — the placeholder-chip and section renderers are
+  prime suspects); keys never logged; `optimize-prompt.js` size caps confirmed (30k already
+  present — verify stream + test endpoints match); a short `SECURITY.md` documents the BYO-key
+  threat model. Feeds owner request 4.9 (the "why BYO key is secure" copy).
+
+### 4.3 Speed to first token < 5 s — `M` — owner: "make it faster, competitor outputs in ~5s"
+- **SMART:** By 2026-07-20, median time-to-first-visible-token ≤ 2 s and time-to-complete
+  ≤ 8 s for a standard prompt on the default hosted model, measured over 20 runs and recorded
+  in `archive/perf-baseline.md`. Streaming path (`optimize-prompt/stream.js`) is the default
+  for the main optimize action.
+- **Done when:** the UI streams tokens as they arrive (verify the stream endpoint is what the
+  Optimize button calls, not the buffered `callCompletion`); a fast default model is selected
+  for the hosted key (see 4.8 — a `:free` fast model, not a 550B model, as the default
+  `optimize` engine); `depth:"deep"` (the second refine pass, which doubles latency) is opt-in
+  and clearly labeled as "slower/higher quality"; perceived latency covered by the progress
+  bar in 5.5. **This is the top competitive gap — do not defer.**
+- **Notes:** the current default hosted model `nvidia/nemotron-3-ultra-550b-a55b:free` is
+  almost certainly the latency problem. Route the default optimize call to a small fast model
+  and reserve the big model for `depth:"deep"`.
+
+### 4.4 Metrics & analytics instrumentation — `M` — (was the queued "Phase 4"; see §4b)
+- **SMART:** By 2026-07-22, ship anonymous event tracking via a Cloudflare Analytics Engine
+  binding + `functions/api/event.js` + a `sendBeacon` `track()` helper, firing the seven
+  events listed in §4b, **before** the feedback round so there is a pre-feedback baseline.
+- **Done when:** events land in Analytics Engine; a private `/api/stats` (or documented SQL
+  query) returns the §4 metric table; no cookies, no IPs, no third-party script; decision on
+  **what** to track is recorded (§4b list is the decision — confirm or trim it).
+- **Owner request:** "decide what to track, how to track it, then implement." §4b already
+  specifies the *what* and *how*; this item is the *implement*. Give to Haiku 4.5.
+
+### 4.5 Documentation set — `L` — owner: full "Documentation" block
+- **SMART:** By 2026-07-25, publish an in-app **Docs / Guide** panel (and matching
+  `docs/` markdown) with five sections, each ≤ 1 screen, reachable from a persistent "Guide"
+  link in the header:
+  1. **Why it exists & who it's for** — the solo-builder + semi-technical-PM personas, the job
+     it does, when *not* to use it.
+  2. **Methodology — how to prompt-optimize** — the outcome-first / delimit-data / output-
+     contract principles the optimizer itself applies (lift from `optimizer.js`'s system
+     prompt so docs and behaviour never drift), **plus one embedded explainer video** (screen-
+     capture walkthrough, ≤ 3 min; script it from the State-1→3 flow in §2).
+  3. **Recommended models & providers** — condensed from `archive/choosing-a-model.md`; which
+     free models to pick, quality/cost tiers, latency notes.
+  4. **App manual** — every control explained: target model, length, strength, techniques,
+     refine, critique, test bench, library, export, variables/placeholders.
+  5. **FAQ / BYO-key & security** — links to 4.2's threat model and 4.9's key help.
+- **Done when:** all five sections live and linked; the video is embedded and plays on mobile;
+  no control in the UI is left unexplained (cross-check against the §4.1 ID inventory);
+  README links to the docs.
+- **Notes:** this directly answers the owner's "I don't even understand variables" — the
+  manual + the 5.4 tooltip are the two-pronged fix.
+
+### 4.6 Feedback round (gate to going live) — `S` — owner: "ask for feedback before going live"
+- **SMART:** Between 2026-07-27 and 2026-08-03, collect ≥ 10 structured responses from real
+  users (existing `#feedbackModal` + a short form) on: first-run clarity, speed, whether they
+  copied the result, and one "what almost stopped you" question. Summarize into a ranked
+  fix-list that re-orders Phase 5 if needed.
+- **Done when:** ≥ 10 responses captured; a one-page findings note added to `archive/`;
+  Phase 5 backlog re-prioritised against it. Requires 4.1–4.5 shipped first (don't ask people
+  to review a buggy, slow, undocumented build).
+
+---
+
+## Phase 5 — UX Clarity, Layout & Mobile  (Sprint 3–4 · target 2026-08-17)
+
+The owner's punch-list. Individually small, collectively the difference between "clever demo"
+and "I'd use this daily." Re-order against 4.6 findings before starting.
+
+### 5.1 Move Options accordion + Optimize button *inside* the input box — `M` — owner request
+- **SMART:** By 2026-08-03, relocate the options accordion and the primary Optimize button to
+  sit inside the input card (mirroring the output card's internal action bar), so the core
+  controls live with the thing they act on. No control moves below the fold at 1366×768 or on
+  a 390px phone.
+- **Done when:** input card contains textarea + inline toolbar (length/target/techniques) +
+  Optimize; verified no reflow/overlap at desktop, tablet, phone; keyboard tab-order still
+  sane.
+
+### 5.2 Rename the "Pretty" output tab — `S` — owner: "more serious / professional sounding"
+- **SMART:** By 2026-07-30, rename the `pretty` view label (keep the `data-view="pretty"` hook
+  or migrate it cleanly). Chosen replacement: **"Structured"** (pairs naturally with the
+  existing "Raw" and "Outline" tabs). Update all three tab labels for consistency.
+- **Done when:** label reads "Structured"; no dangling references to "Pretty" in UI copy; docs
+  (4.5) use the new name.
+
+### 5.3 Free-model dropdown — `M` — owner: "dropdown to choose between the free models"
+- **SMART:** By 2026-08-06, add a curated **"Free model"** picker in Settings (and/or the
+  engine pill) listing the known-good free options (OpenRouter `:free` tiers, NVIDIA NIM,
+  Gemini free) with a one-line quality/speed note each, defaulting to the fast one chosen in
+  4.3. Selecting one updates provider+model+baseUrl in one click.
+- **Done when:** picker lists ≥ 4 free models with notes; selection persists in `localStorage`;
+  falls back gracefully if a free endpoint 429s (the fallback plumbing already exists in
+  `resolveProviderConfig`). Complements the "recommended models" docs (4.5.3).
+
+### 5.4 Info tooltips: target model + variables — `S` — owner: "why does target model matter" / "I don't understand variables"
+- **SMART:** By 2026-07-31, add an `(i)` tooltip to the target-model chips ("Different models
+  read prompts differently — Claude prefers XML tags, GPT prefers markdown; this tailors the
+  rewrite") and to the variables/placeholder feature ("`{{like_this}}` marks a blank you fill
+  in later — reuse the same prompt with different inputs without rewriting it").
+- **Done when:** both tooltips present, keyboard-accessible, and mobile-tappable (not hover-
+  only); variables tooltip links to the 4.5.4 manual section. Pairs with docs to fully resolve
+  the owner's confusion.
+
+### 5.5 Progress bar + time + token/cost readout — `M` — owner: "progress bar, time taken, tokens cost"
+- **SMART:** By 2026-08-10, show a determinate-feel progress indicator during optimize, and on
+  completion display **elapsed time (s)** and **token usage** (prompt+completion; use provider
+  usage fields when returned, else the chars/4 estimate already in the app), plus an estimated
+  cost when a paid model is selected.
+- **Done when:** progress UI shows during the stream; post-run strip shows `⏱ 3.4 s · ~820
+  tokens · ~$0.001`; values come from the stream where available. Rolls the reviewers' "token
+  & cost counter" into one owner-requested strip.
+
+### 5.6 Mobile & tablet responsiveness overhaul — `L` — owner: multiple mobile requests
+- **SMART:** By 2026-08-15, the app scores ≥ 95 on Lighthouse mobile "best practices" and is
+  fully usable at 360–768px, with these specific fixes:
+  - **Output above input on mobile** — on ≤ 768px, result region renders above the input so
+    users see the answer without scrolling.
+  - **No horizontal scrollbar** on any mobile viewport (audit fixed widths, the 800px column,
+    long unbroken prompt tokens → `overflow-wrap`).
+  - **Better success toasts on mobile** — replace/adjust the current submission popups with
+    mobile-friendly toasts that don't get clipped by the viewport or the keyboard.
+- **Done when:** manual pass on 360/390/768px; no sideways scroll; output-first order on
+  mobile confirmed; toasts readable and auto-dismissing; tap targets ≥ 44px (already partly
+  done in Phase 1).
+
+### 5.7 API-key help & trust copy — `S` — owner: "how to get/paste key, where free ones are, why BYO is secure"
+- **SMART:** By 2026-08-07, the Settings/API panel gains a "Where do I get a key?" link block:
+  step-by-step for 2–3 free providers, a one-paragraph "your key is stored only in this
+  browser and sent directly to the provider — never to our server or logs" note (sourced from
+  4.2's `SECURITY.md`), and a link to the docs.
+- **Done when:** copy present; links resolve; claims match the actual code path verified in
+  4.2 (no server-side persistence/logging of BYO keys).
+
+### 5.8 Keyboard & input niceties — `S` — (reviewer consensus, cheap)
+- **SMART:** By 2026-08-12, `Cmd/Ctrl+Enter` triggers Optimize from the textarea, and dropping
+  a `.txt`/`.md` file into the input loads its contents.
+- **Done when:** both work on desktop; documented in the manual; don't interfere with mobile.
+
+---
+
+## Phase 6 — Evaluation & Quality (the "serious tool" wave)  (target 2026-09-21)
+
+Where every reviewer converged: stop *asserting* the prompt is better, start *proving* it.
+Build cheap/free client-side signals first, then the AI-backed ones.
+
+### 6.1 Client-side prompt linter (free, instant) — `M`
+- **SMART:** By 2026-08-24, a zero-API, rule-based linter flags common defects as you type:
+  asks for JSON without a schema, conflicting instructions ("creative" + "strictly factual"),
+  unspecified output length, unbounded lists, missing anti-hallucination out. ≥ 8 rules.
+- **Done when:** ≥ 8 lint rules fire on crafted test inputs; warnings are dismissible and
+  link to the relevant methodology doc; runs with no API cost/latency.
+- **Why first:** free, fast, teaches users, and reuses the principles already in
+  `optimizer.js`. This is the low-cost half of every reviewer's "linter/doctor/score" idea.
+
+### 6.2 Prompt quality score + rubric — `M` — (reviewers' "score/doctor/complexity meter")
+- **SMART:** By 2026-09-03, extend the **existing `critique` mode** (already in `optimizer.js`
+  as `buildCritiquePrompt`, scoring 4 axes 1–10) into a visible **before/after score**: show
+  raw-prompt score, optimized-prompt score, and the delta, with the 4-axis breakdown as a
+  small bar/radar. One API call, reusing the critique scaffold.
+- **Done when:** score panel renders raw vs optimized with axis breakdown; numbers come from
+  the critique call, not a made-up client heuristic; degrades gracefully if the model returns
+  malformed scores (the parser is already tolerant). Consolidates "quality score", "rubric",
+  "prompt doctor", "complexity meter" into one honest feature.
+
+### 6.3 Eval / test-case suite with auto-scoring — `XL` — (reviewer "killer feature")
+- **SMART:** By 2026-09-21, users add 3–10 test cases (input → expected/criteria), run both
+  raw and optimized prompts against them, and get a pass-rate score per prompt ("optimized:
+  8/10 vs raw: 5/10"). Built on the existing Test Bench + provider plumbing.
+- **Done when:** users can add/edit/save cases (localStorage, tied to a library prompt); a run
+  scores each case (LLM-as-judge for open-ended, exact/contains for deterministic); results
+  show side-by-side pass rates; cost/latency of a full run is shown before the user commits.
+- **Notes:** biggest item in Phase 6; the conversion-critical one per the reviews. Prereq for
+  6.4 and 7.5. Keep judge calls opt-in (cost).
+
+### 6.4 Variables & templating clarity pass — `M` — owner: "I don't understand variables" (product side)
+- **SMART:** By 2026-09-10, make the *already-built* variable sandbox (Phase 2 item 4)
+  discoverable and self-explaining: an empty-state hint ("Add `{{name}}` to reuse this prompt
+  with different inputs"), a one-click "turn selection into a variable", and the 5.4 tooltip.
+- **Done when:** a first-time user can create, fill, and export a variable prompt without docs;
+  the "convert selection to `{{var}}`" action works; export already carries the variable
+  schema (Phase 3). This closes the loop the owner flagged — the feature exists, the *framing*
+  didn't.
+
+---
+
+## Phase 7 — Novel bets (the moat)  (target Q4 2026)
+
+The things no competitor ships. Each is independently valuable; sequence by the impact/effort
+notes. These are the ideas from the second review wave that survived the "fits a no-DB,
+BYO-key, Cloudflare static app" filter.
+
+### 7.1 No-DB shareable permalinks — `M` — **highest reach-per-effort**
+- **SMART:** By 2026-10-05, any result is shareable via a URL whose hash encodes
+  (compressed+base64) the raw prompt, options, and optimized result; opening it reconstructs
+  the full view client-side. Adds a read-only embed view.
+- **Done when:** "Share link" copies a working URL; opening it in a fresh browser reproduces
+  the result with no network call and no backend/storage; URL stays under practical length
+  limits (compress; fall back to "too large to link" past a threshold). Elegant *because* of
+  the no-DB architecture; turns every user into a distributor.
+
+### 7.2 Prompt-injection / robustness harness — `L` — **top differentiator**
+- **SMART:** By 2026-10-19, a "Harden" action injects a standard battery of attacks (instruction
+  override, delimiter break-out via a fake `</task>` tag, prompt-leak probe) into the data/
+  variable slots of the optimized prompt, runs them, and reports whether boundaries held, with
+  concrete fix suggestions when they don't.
+- **Done when:** ≥ 5 attack templates; a pass/fail verdict per attack against a chosen model;
+  remediation tips reference the delimiting principles in `optimizer.js`. Defensive-security
+  framing; a chargeable, defensible claim no prompt tool makes. Builds on 6.3's runner.
+
+### 7.3 Reverse mode: output → prompt — `M`
+- **SMART:** By 2026-10-12, a new mode where the user pastes a *desired output* and gets a
+  prompt that would reliably reproduce it, via a new `mode:"reverse"` branch alongside
+  `critique`.
+- **Done when:** reverse mode reachable from the UI; returns a structured prompt + rationale in
+  the existing two-block format; documented. Distinct acquisition story ("I want more like
+  *this*"), minimal new infra.
+
+### 7.4 Multi-model compatibility variants — `L`
+- **SMART:** By 2026-11-02, one click produces the prompt tailored for 2–3 targets
+  (Claude/GPT/Gemini) with a compact compatibility readout, reusing `TARGET_MODEL_GUIDELINES`.
+- **Done when:** parallel/sequential generation within the Cloudflare time budget (watch the
+  26s deadline in `resolveProviderConfig` — may need the stream path or a client-side fan-out
+  of separate requests); results tabbed per model; cost shown up front. Note: the original
+  masterplan deferred a full A/B matrix as "high cost, low demand" — revisit only if usage
+  supports it.
+
+### 7.5 Cost-to-pass model recommender — `L` (depends on 6.3)
+- **SMART:** Once the eval suite (6.3) exists, by 2026-11-16 recommend the cheapest model that
+  still passes the user's test cases ("gemini-3-5-flash passes all 5 at 1/40th the cost").
+- **Done when:** given a saved eval set, runs it across a small model panel and ranks by
+  cost-per-pass; shows the recommendation with the evidence. The product-level synthesis of the
+  reviewers' cost counter + eval suite.
+
+### 7.6 Backlog / opportunistic (spec later, build on demand)
+- **Comprehension check / back-translation** (`S`): one cheap call showing "here's what the
+  model thinks you're asking" before a real run.
+- **Ablation-based signal attribution** (`M`): strip each section, re-run, report which parts
+  carry no signal (empirical, not a vibe score). Depends on 6.3's runner.
+- **Ensemble disagreement detector** (`M`): run the optimize step through two optimizer models;
+  where they diverge = your intent was ambiguous.
+- **Anti-goal field** (`S`): a "what I do NOT want" input folded into `## Constraints`.
+- **Prompt staleness / drift pin** (`M`): store the model+date a saved prompt was validated
+  against; flag "unverified since the model changed."
+- **Prompt chaining** (`L`), **intent detection** (`M`), **optimization-mode presets**
+  (minimal-edit/clarity/token-efficient/etc.) (`M`), **few-shot example generator** (`M`).
+
+---
+
+## Phase 8 — Platform & distribution (backlog, needs a bigger commitment)
+
+Large efforts that change the project's shape. Do **not** start until Phases 4–6 have proven
+retention; several conflict with the "no accounts, no backend" identity and need an explicit
+decision to cross that line.
+
+- **Browser extension** (`XL`) — optimize inline on ChatGPT/Claude/Gemini/Cursor. Biggest
+  distribution lever; a separate codebase and store-review pipeline. Highest-value Phase-8 bet.
+- **CLI + public API** (`XL`) — `promptoptimize "…"`; programmatic access for CI. The Pages
+  Functions are already an API — this is packaging + auth + rate-limiting + docs.
+- **Multimodal input** (`XL`) — optimize from a screenshot/PDF/sketch. Needs a
+  vision-capable model path; real cost.
+- **Voice input** (`M`) — Web Speech API mic button for dictating the rough idea. Smaller;
+  could slot earlier as a Phase-5 nice-to-have if demand shows.
+- **Team features** (`XL`) — shared libraries, comments, review workflow. **Explicitly
+  rejected in §3's "Deliberately NOT doing"** for a free static tool; only revisit if you
+  decide to add accounts + a backend and monetize team/enterprise. Keep 90% free (owner's
+  and reviewers' shared stance).
+
+---
+
+## 6.x Owner punch-list → where it lives
+
+Quick index so nothing the owner asked for is lost:
+
+| Owner request | Item |
+|---|---|
+| Documentation (why/who, methodology + video, models, manual) | 4.5 |
+| Options tooltip: why target model matters | 5.4 |
+| Variables: "I don't understand it" | 5.4 (tooltip) + 4.5.4 (manual) + 6.4 (product clarity) |
+| Rename "Pretty" tab | 5.2 |
+| Free-models dropdown | 5.3 |
+| Make it faster (~5s) | 4.3 |
+| Move options + Optimize button inside the box | 5.1 |
+| Deep code-cleanness scan / bugs | 4.1 |
+| Security audit | 4.2 |
+| API-key help + why BYO is secure | 5.7 (+ 4.2) |
+| Progress bar + time + token cost | 5.5 |
+| Tablet/phone responsiveness | 5.6 |
+| Output on top on mobile / no scrollbar | 5.6 |
+| Better mobile success popups | 5.6 |
+| Ask for feedback before launch | 4.6 |
+| Decide + implement analytics | 4.4 (+ §4b) |

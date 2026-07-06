@@ -2080,6 +2080,21 @@
           });
       }
 
+      function parseFetchResponse(res) {
+        var contentType = res.headers.get('content-type');
+        if (contentType && contentType.indexOf('application/json') !== -1) {
+          return res.json().then(function (data) {
+            return { ok: res.ok, data: data };
+          });
+        } else {
+          return res.text().then(function (text) {
+            var msg = text || res.statusText || 'Server error';
+            if (msg.length > 200) msg = msg.slice(0, 200) + '...';
+            return { ok: false, data: { error: 'HTTP ' + res.status + ': ' + msg } };
+          });
+        }
+      }
+
       var settingsModal = document.getElementById('settingsModal');
       var settingsProvider = document.getElementById('settingsProvider');
       var settingsApiKey = document.getElementById('settingsApiKey');
@@ -2532,9 +2547,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         })
-          .then(function (res) {
-            return res.json().then(function (data) { return { ok: res.ok, data: data }; });
-          })
+          .then(parseFetchResponse)
           .then(function (result) {
             var data = result.data;
             if (!data || !data.ok) throw new Error((data && data.error) || 'Optimization failed.');
@@ -2760,7 +2773,7 @@
         })
           .then(function (res) {
             clearTimeout(timeoutId);
-            return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+            return parseFetchResponse(res);
           })
           .then(function (result) {
             var data = result.data;
@@ -3521,9 +3534,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         })
-          .then(function (res) {
-            return res.json().then(function (data) { return { ok: res.ok, data: data }; });
-          })
+          .then(parseFetchResponse)
           .then(function (result) {
             var data = result.data;
             if (!data || !data.ok) throw new Error((data && data.error) || 'Refinement failed.');
