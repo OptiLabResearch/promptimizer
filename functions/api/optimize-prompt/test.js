@@ -127,10 +127,10 @@ export async function runUnitTests() {
     assert.ok(explanationText === "this is explanation", "Should parse explanation properly when it appears first");
   });
 
-  await runTest("resolveProviderConfig validation when key is missing and provider not hosted", () => {
+  await runTest("resolveProviderConfig validation when key is missing and provider not hosted", async () => {
     let errorMsg = "";
     try {
-      resolveProviderConfig({ provider: "nvidia" }, { HOSTED_PROVIDER: "google,openai" });
+      await resolveProviderConfig({ provider: "nvidia" }, { HOSTED_PROVIDER: "google,openai" });
     } catch (e) {
       if (e instanceof ValidationError) errorMsg = e.message;
     }
@@ -178,7 +178,7 @@ export async function onRequestPost({ request, env }) {
 
   let config;
   try {
-    config = resolveProviderConfig(body, env);
+    config = await resolveProviderConfig(body, env);
   } catch (e) {
     if (e instanceof ValidationError) return json({ ok: false, error: e.message }, 400);
     throw e;

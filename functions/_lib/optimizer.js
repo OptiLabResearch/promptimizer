@@ -350,10 +350,123 @@ export function parseDelimitedResponse(rawResponse) {
   return { optimizedText, explanationText };
 }
 
+const CIRCUIT_CACHE_KEY = "https://prompt-optimizer.local/circuit-breaker-state";
+const localMemoryCache = new Map();
+
+async function getCircuitStatus(provider, model) {
+  const cacheKey = `${provider}:${model}`;
+  
+  if (localMemoryCache.has(cacheKey)) {
+    const expires = localMemoryCache.get(cacheKey);
+    if (Date.now() < expires) return true;
+    localMemoryCache.delete(cacheKey);
+  }
+
+  try {
+    if (typeof caches !== "undefined" && caches.default) {
+      const cache = caches.default;
+      const response = await cache.match(new Request(CIRCUIT_CACHE_KEY));
+      if (response) {
+        const data = await response.json();
+        if (data[cacheKey] && Date.now() < data[cacheKey]) {
+          return true;
+        }
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
+async function muteModelInCircuit(provider, model, durationSeconds) {
+  const cacheKey = `${provider}:${model}`;
+  const expiresAt = Date.now() + (durationSeconds * 1000);
+  
+  localMemoryCache.set(cacheKey, expiresAt);
+
+  try {
+    if (typeof caches !== "undefined" && caches.default) {
+      const cache = caches.default;
+      let state = {};
+      const req = new Request(CIRCUIT_CACHE_KEY);
+      const existing = await cache.match(req);
+      if (existing) {
+        try {
+          state = await existing.json();
+        } catch (err) {}
+      }
+      state[cacheKey] = expiresAt;
+
+      const response = new Response(JSON.stringify(state), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": `max-age=${durationSeconds}`,
+        }
+      });
+      await cache.put(req, response);
+    }
+  } catch (e) {}
+}
+
+async function fetchActiveModelsForProvider(provider, baseUrl, apiKey) {
+  const cacheUrl = `https://prompt-optimizer.local/catalog-cache-${provider}`;
+  
+  try {
+    if (typeof caches !== "undefined" && caches.default) {
+      const cache = caches.default;
+      const cachedResp = await cache.match(new Request(cacheUrl));
+      if (cachedResp) {
+        return await cachedResp.json();
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const url = `${baseUrl.replace(/\/$/, "")}/models`;
+    const headers = {
+      "Content-Type": "application/json",
+      ...(provider === "anthropic" 
+        ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
+        : { "Authorization": `Bearer ${apiKey}` })
+    };
+    
+    const controller = new AbortController();
+    const tId = setTimeout(() => controller.abort(), 5000);
+    
+    const resp = await fetch(url, { headers, signal: controller.signal });
+    clearTimeout(tId);
+    
+    if (resp.ok) {
+      const result = await resp.json();
+      if (result) {
+        const modelsList = Array.isArray(result.data) ? result.data : result;
+        const activeSlugs = modelsList.map(m => String(m.id || m.model || "").trim()).filter(Boolean);
+
+        if (activeSlugs.length > 0) {
+          try {
+            if (typeof caches !== "undefined" && caches.default) {
+              const cache = caches.default;
+              await cache.put(new Request(cacheUrl), new Response(JSON.stringify(activeSlugs), {
+                headers: {
+                  "Content-Type": "application/json",
+                  "Cache-Control": "max-age=43200",
+                }
+              }));
+            }
+          } catch (e) {}
+          return activeSlugs;
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to fetch official model catalog for ${provider}:`, e);
+  }
+  return null;
+}
+
 // Resolves which provider config to use: the caller's own key (BYO, from the
 // request body) takes priority; otherwise fall back to a shared key from
 // environment secrets (only present on the maintainer's hosted instance).
-export function resolveProviderConfig(body, env) {
+export async function resolveProviderConfig(body, env) {
   const bodyApiKey = String(body.api_key || "").trim();
   const bodyProvider = String(body.provider || "").trim().toLowerCase();
   const bodyModel = String(body.model || "").trim();
@@ -386,6 +499,27 @@ export function resolveProviderConfig(body, env) {
     }
   }
 
+  // Pre-load catalogs for any hosted provider dynamically to filter out rotated models
+  const catalogs = {};
+  for (const provider of sharedProviders) {
+    const preset = PROVIDER_PRESETS[provider];
+    if (!preset || !preset.baseUrl) continue;
+    
+    const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+    const key = env[`${cleanProviderName}_API_KEY`] || 
+                env[`${cleanProviderName}_KEY`] ||
+                (provider === "nvidia" ? env.NVIDIA_API_KEY :
+                 provider === "openrouter" ? env.OPENROUTER_API_KEY :
+                 provider === "google" ? env.GOOGLE_API_KEY : undefined);
+                 
+    if (key) {
+      const activeList = await fetchActiveModelsForProvider(provider, preset.baseUrl, key);
+      if (activeList) {
+        catalogs[provider] = activeList;
+      }
+    }
+  }
+
   const attempts = [];
   sharedProviders.forEach((provider, i) => {
     const preset = PROVIDER_PRESETS[provider];
@@ -408,10 +542,30 @@ export function resolveProviderConfig(body, env) {
       .map((m) => m.trim())
       .filter(Boolean);
     if (!models.length && preset.defaultModel) models.push(preset.defaultModel);
-    for (const model of models) attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model, provider });
+    
+    for (const model of models) {
+      // If the official catalog was fetched successfully and this model is not in it, skip it
+      if (catalogs[provider] && !catalogs[provider].includes(model)) {
+        continue;
+      }
+      attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model, provider });
+    }
   });
 
-  if (attempts.length) return { attempts, source: "hosted", deadline };
+  // Filter out any attempts that are currently muted in the circuit breaker
+  let activeAttempts = [];
+  for (const attempt of attempts) {
+    if (!(await getCircuitStatus(attempt.provider, attempt.model))) {
+      activeAttempts.push(attempt);
+    }
+  }
+
+  // Last resort fallback: if all attempts were filtered out by the circuit breaker, try all of them anyway
+  if (activeAttempts.length === 0) {
+    activeAttempts = attempts;
+  }
+
+  if (activeAttempts.length) return { attempts: activeAttempts, source: "hosted", deadline };
 
   throw new ValidationError(
     "No API key configured. Add your own key in Settings, or ask the site owner to configure a shared key."
@@ -514,6 +668,26 @@ async function executeWithFallback(config, systemPrompt, userText, maxTokens, st
     } catch (e) {
       lastError = e;
       if (signal?.aborted) break;
+
+      // Trigger Circuit Breaker Mute
+      try {
+        const isTimeout = e.name === "AbortError" || /timeout|abort/i.test(e.message || "");
+        const isRateLimit = /error \(429\)/i.test(e.message || "");
+        const isAuthError = /error \(401\)|error \(403\)/i.test(e.message || "");
+
+        if (isAuthError) {
+          // Mute for 24 hours if key is unauthorized
+          await muteModelInCircuit(attempt.provider, attempt.model, 86400);
+        } else if (isRateLimit) {
+          // Mute for 1 hour if rate limited
+          await muteModelInCircuit(attempt.provider, attempt.model, 3600);
+        } else if (isTimeout) {
+          // Mute for 10 minutes if timed out
+          await muteModelInCircuit(attempt.provider, attempt.model, 600);
+        }
+      } catch (muteErr) {
+        // Fail silently so circuit breaker error doesn't hide the original API error
+      }
     } finally {
       clearTimeout(timeoutId);
       if (signal && abortHandler) {

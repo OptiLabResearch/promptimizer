@@ -9,7 +9,7 @@ import {
 
 export async function onRequestGet({ env }) {
   try {
-    const config = resolveProviderConfig({}, env);
+    const config = await resolveProviderConfig({}, env);
     const first = config.attempts[0];
     return json({ ok: true, provider: first.provider || null, model: first.model || null, source: config.source });
   } catch (e) {
@@ -40,7 +40,7 @@ export async function onRequestPost({ request, env }) {
   let systemPrompt, userText, config;
   try {
     ({ systemPrompt, userText } = buildOptimizePrompt(body, rawPrompt));
-    config = resolveProviderConfig(body, env);
+    config = await resolveProviderConfig(body, env);
   } catch (e) {
     if (e instanceof ValidationError) return json({ ok: false, error: e.message }, 400);
     throw e;

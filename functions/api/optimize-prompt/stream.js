@@ -26,7 +26,7 @@ export async function onRequestPost({ request, env }) {
   let systemPrompt, userText, config;
   try {
     ({ systemPrompt, userText } = buildOptimizePrompt(body, rawPrompt));
-    config = resolveProviderConfig(body, env);
+    config = await resolveProviderConfig(body, env);
   } catch (e) {
     if (e instanceof ValidationError) return json({ ok: false, error: e.message }, 400);
     throw e;

@@ -1731,6 +1731,7 @@
           <label for="settingsApiKey">API key</label>
           <input class="form-input" type="password" id="settingsApiKey" placeholder="sk-...">
           <span class="form-hint">Stored only in your browser (localStorage), sent directly to the provider per-request. Never touches our server logs.</span>
+          <span class="form-hint" id="settingsFreeKeyHint" style="display:none; margin-top:6px;"></span>
         </div>
         <div class="form-field" id="settingsModelGroup" style="display:none;">
           <label for="settingsModel">Model</label>
@@ -2103,6 +2104,7 @@
       var settingsApiKeyGroup = document.getElementById('settingsApiKeyGroup');
       var settingsModelGroup = document.getElementById('settingsModelGroup');
       var settingsBaseUrlGroup = document.getElementById('settingsBaseUrlGroup');
+      var settingsFreeKeyHint = document.getElementById('settingsFreeKeyHint');
 
       function onProviderChange() {
         var provider = settingsProvider.value;
@@ -2112,6 +2114,20 @@
         settingsModelGroup.style.display = provider ? 'flex' : 'none';
         if (provider && !settingsModel.value) {
           settingsModel.value = (PROVIDER_DEFAULTS[provider] || {}).model || '';
+        }
+
+        // Show specific free key helper links based on selected provider
+        if (provider === 'google') {
+          settingsFreeKeyHint.style.display = 'block';
+          settingsFreeKeyHint.innerHTML = 'Need a key? Get a free API key at <a href="https://aistudio.google.com/" target="_blank" style="color: var(--accent); text-decoration: underline;">Google AI Studio</a> (generous free tier: 15 RPM / 500 RPD).';
+        } else if (provider === 'nvidia') {
+          settingsFreeKeyHint.style.display = 'block';
+          settingsFreeKeyHint.innerHTML = 'Need a key? Get a free trial API key at the <a href="https://build.nvidia.com/" target="_blank" style="color: var(--accent); text-decoration: underline;">NVIDIA Build Portal</a>.';
+        } else if (provider === 'openrouter') {
+          settingsFreeKeyHint.style.display = 'block';
+          settingsFreeKeyHint.innerHTML = 'Need a key? Get a key at <a href="https://openrouter.ai/" target="_blank" style="color: var(--accent); text-decoration: underline;">OpenRouter</a> (many free-tier models are available).';
+        } else {
+          settingsFreeKeyHint.style.display = 'none';
         }
       }
       settingsProvider.addEventListener('change', onProviderChange);
