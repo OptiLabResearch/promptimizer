@@ -131,39 +131,74 @@ export class ValidationError extends Error {}
 export class RateLimitError extends Error {}
 
 const RATE_LIMIT_CACHE_PREFIX = "https://prompt-optimizer.local/ratelimit-";
-const RATE_LIMIT_WINDOW_SECONDS = 60;
-const RATE_LIMIT_MAX_REQUESTS = 20;
+const RATE_LIMIT_MINUTE_WINDOW_SECONDS = 60;
+const RATE_LIMIT_MINUTE_MAX = 5;
+const RATE_LIMIT_HOUR_WINDOW_SECONDS = 3600;
+const RATE_LIMIT_HOUR_MAX = 20;
+const RATE_LIMIT_LOCKOUT_SECONDS = 5 * 3600;
 
-// Cheap per-IP abuse guard for requests that spend the site owner's shared
-// hosted API keys (no body.api_key). Uses the same Cache API mechanism as the
+const BYOK_HINT = "or add your own free API key in Settings — visit https://freellm.net/ for a list of current free-tier LLM API keys and instructions on how to get one.";
+
+async function bumpRateLimitCount(cache, request, ttlSeconds) {
+  const existing = await cache.match(request);
+  let count = 0;
+  if (existing) {
+    const data = await existing.json().catch(() => ({ count: 0 }));
+    count = data.count || 0;
+  }
+  count += 1;
+  await cache.put(request, new Response(JSON.stringify({ count }), {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": `max-age=${ttlSeconds}`,
+    },
+  }));
+  return count;
+}
+
+// Two-tier per-IP abuse guard for requests that spend the site owner's shared
+// hosted API keys (no body.api_key): a short burst cap plus a stricter hourly
+// cap that, once tripped, locks the IP out for several hours rather than
+// resetting on the next window. Uses the same Cache API mechanism as the
 // circuit breaker above, so it needs no extra bindings; fails open if the
 // Cache API isn't available (e.g. local dev) or errors.
 export async function enforceHostedRateLimit(env, request) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  const windowId = Math.floor(Date.now() / (RATE_LIMIT_WINDOW_SECONDS * 1000));
-  const cacheUrl = `${RATE_LIMIT_CACHE_PREFIX}${ip}-${windowId}`;
 
   try {
     if (typeof caches === "undefined" || !caches.default) return;
     const cache = caches.default;
-    const req = new Request(cacheUrl);
-    const existing = await cache.match(req);
-    let count = 0;
-    if (existing) {
-      const data = await existing.json().catch(() => ({ count: 0 }));
-      count = data.count || 0;
+
+    const lockoutReq = new Request(`${RATE_LIMIT_CACHE_PREFIX}lockout-${ip}`);
+    if (await cache.match(lockoutReq)) {
+      throw new RateLimitError(
+        `You've hit the shared free-key hourly limit and are temporarily paused. Please wait a few hours, ${BYOK_HINT}`
+      );
     }
-    count += 1;
 
-    await cache.put(req, new Response(JSON.stringify({ count }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": `max-age=${RATE_LIMIT_WINDOW_SECONDS}`,
-      },
-    }));
+    const minuteWindow = Math.floor(Date.now() / (RATE_LIMIT_MINUTE_WINDOW_SECONDS * 1000));
+    const hourWindow = Math.floor(Date.now() / (RATE_LIMIT_HOUR_WINDOW_SECONDS * 1000));
+    const minuteReq = new Request(`${RATE_LIMIT_CACHE_PREFIX}min-${ip}-${minuteWindow}`);
+    const hourReq = new Request(`${RATE_LIMIT_CACHE_PREFIX}hour-${ip}-${hourWindow}`);
 
-    if (count > RATE_LIMIT_MAX_REQUESTS) {
-      throw new RateLimitError("Too many requests. Please wait a minute and try again, or add your own API key in Settings.");
+    const [minuteCount, hourCount] = await Promise.all([
+      bumpRateLimitCount(cache, minuteReq, RATE_LIMIT_MINUTE_WINDOW_SECONDS),
+      bumpRateLimitCount(cache, hourReq, RATE_LIMIT_HOUR_WINDOW_SECONDS),
+    ]);
+
+    if (hourCount > RATE_LIMIT_HOUR_MAX) {
+      await cache.put(lockoutReq, new Response("1", {
+        headers: { "Cache-Control": `max-age=${RATE_LIMIT_LOCKOUT_SECONDS}` },
+      }));
+      throw new RateLimitError(
+        `You've hit the shared free-key hourly limit. Please wait a few hours, ${BYOK_HINT}`
+      );
+    }
+
+    if (minuteCount > RATE_LIMIT_MINUTE_MAX) {
+      throw new RateLimitError(
+        `Too many requests — please slow down and try again in a minute, ${BYOK_HINT}`
+      );
     }
   } catch (e) {
     if (e instanceof RateLimitError) throw e;
