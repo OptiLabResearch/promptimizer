@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f7f7f5;
+    --bg: #f6f7fb;
     --panel: #ffffff;
     --panel-inset: #fafaf8;
     --control: #f1f1ef;
@@ -18,8 +18,8 @@
     --text-soft: #3f4250;
     --text-mid: #5c5f6c;
     --text-mut: #8a8d99;
-    --line: #eeeeec;
-    --border: #e3e3e0;
+    --line: rgba(0, 0, 0, 0.08);
+    --border: rgba(0, 0, 0, 0.1);
     --border-hover: #c9c9c5;
     --accent: oklch(0.62 0.17 285);
     --accent-deep: oklch(0.5 0.17 285);
@@ -174,8 +174,9 @@
   .workbench {
     flex: 1;
     min-height: 0;
-    display: flex;
-    gap: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
     max-width: 1280px;
     width: 100%;
     margin: 0 auto;
@@ -190,12 +191,12 @@
   }
 
   .input-col { flex: 1; }
-  .output-col { flex: 1.05; }
+  .output-col { flex: 1; }
 
   .card {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow: var(--card-shadow);
     display: flex;
     flex-direction: column;
@@ -252,30 +253,53 @@
   #rawPrompt::placeholder { color: var(--text-mut); }
 
   /* ---------- Options card ---------- */
-  .options-card { flex: none; overflow: visible; }
-
   .options-toggle {
-    background: none;
+    flex: none;
+    height: 44px;
+    padding: 0 16px;
+    background: transparent;
     border: none;
+    border-top: 1px solid var(--line);
     display: flex;
     align-items: center;
     justify-content: space-between;
     width: 100%;
     cursor: pointer;
     color: inherit;
+    transition: background-color 0.15s ease;
+  }
+
+  .options-toggle:hover {
+    background-color: var(--panel-inset);
+  }
+
+  .options-toggle-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-mid);
   }
 
   .options-chevron {
     color: var(--text-mut);
-    font-size: 11px;
-    transition: transform 0.15s ease;
+    font-size: 9px;
+    display: inline-block;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: rotate(0deg);
+  }
+
+  .options-toggle[aria-expanded="true"] .options-chevron {
+    transform: rotate(180deg);
   }
 
   .options-body {
-    padding: 14px 16px 16px;
+    padding: 12px 16px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px 18px;
+    gap: 10px 14px;
+    background: var(--panel-inset);
+    border-top: 1px solid var(--line);
   }
 
   .options-body.collapsed { display: none; }
@@ -416,30 +440,27 @@
   .cta-btn {
     flex: none;
     width: 100%;
-    min-height: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--accent);
+    background: linear-gradient(90deg, #2a5bd6, #38b6d6, #8b5cf6);
     color: #fff;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
     border: none;
-    border-radius: 9px;
-    padding: 12px;
+    border-radius: 8px;
     cursor: pointer;
     transition: filter 0.15s ease;
   }
   .cta-btn:hover { filter: brightness(1.12); }
   .cta-btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
 
-  .cta-container {
+  .raw-prompt-footer {
     flex: none;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: auto;
-    padding-bottom: 12px;
+    padding: 10px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    background: var(--panel);
   }
 
   .cta-hint {
@@ -706,77 +727,82 @@
   /* ---------- Output card footer ---------- */
   .output-footer {
     flex: none;
-    padding: 12px 16px;
-    border-top: 1px solid var(--line);
+    padding: 10px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
     display: flex;
-    flex-direction: column;
     gap: 8px;
+    background: var(--panel);
   }
 
-  .action-row { display: flex; gap: 8px; position: relative; }
-
   .copy-btn {
-    flex: 1;
-    min-height: 44px;
+    flex: 0 0 70%;
+    height: 44px;
+    border-radius: 8px;
+    background: #f0f1f5;
+    color: #1a1a1a;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--accent);
-    color: #fff;
-    text-align: center;
-    font-size: 15px;
-    font-weight: 600;
-    border: none;
-    border-radius: 8px;
-    padding: 10px;
     cursor: pointer;
     transition: filter 0.15s ease;
   }
-  .copy-btn:hover { filter: brightness(1.12); }
+  .copy-btn:hover { filter: brightness(0.95); }
 
   .save-btn {
-    min-height: 44px;
+    flex: 1;
+    height: 44px;
+    border-radius: 8px;
+    background: #f0f1f5;
+    color: #c9a227;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--gold-border);
-    background: var(--gold-bg);
-    color: var(--gold-text);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 13px;
-    font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
+    transition: filter 0.15s ease;
   }
+  .save-btn:hover { filter: brightness(0.95); }
 
   .save-btn.saved {
-    background: var(--gold-text);
-    border-color: var(--gold-text);
-    color: #fff;
+    background: #f0f1f5;
+    color: #c9a227;
   }
 
   .menu-btn {
-    min-height: 44px;
+    height: 30px;
+    width: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 1px solid var(--border);
     background: transparent;
-    border-radius: 8px;
-    padding: 10px 12px;
+    border-radius: 6px;
     font-size: 14px;
     color: var(--text-mid);
     cursor: pointer;
-    transition: border-color 0.15s ease;
+    transition: all 0.15s ease;
   }
-  .menu-btn:hover { border-color: var(--border-hover); }
+  .menu-btn:hover {
+    border-color: var(--border-hover);
+    background: var(--control-alt);
+  }
+
+  .dev-menu-container {
+    position: relative;
+    display: inline-block;
+  }
 
   .dev-menu {
     display: none;
     position: absolute;
     right: 0;
-    bottom: 46px;
+    top: 34px;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -785,7 +811,7 @@
     color: var(--text-soft);
     flex-direction: column;
     min-width: 200px;
-    z-index: 2;
+    z-index: 10;
     overflow: hidden;
   }
 
@@ -810,6 +836,7 @@
     font-size: 13px;
     cursor: pointer;
     font-family: inherit;
+    width: 100%;
   }
   .dev-menu button:hover { background: var(--panel-inset); }
 
@@ -825,6 +852,27 @@
     padding: 9px;
     cursor: pointer;
     font-family: inherit;
+    margin-top: 16px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  html[data-theme="dark"] .raw-prompt-footer,
+  html[data-theme="dark"] .output-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  html[data-theme="dark"] .copy-btn {
+    background: var(--control-alt);
+    color: var(--text);
+  }
+  html[data-theme="dark"] .save-btn {
+    background: var(--control-alt);
+    color: var(--gold-text);
+  }
+  html[data-theme="dark"] .copy-btn:hover,
+  html[data-theme="dark"] .save-btn:hover {
+    filter: brightness(1.15);
   }
 
   /* ---------- Test Bench (3b) ---------- */
@@ -1504,8 +1552,10 @@
     html, body { height: auto; overflow: visible; }
     body { overflow: visible; }
     .workbench {
+      display: flex;
       flex-direction: column;
       overflow: visible;
+      gap: 16px;
     }
     .input-col, .output-col {
       min-height: 380px;
@@ -1546,12 +1596,10 @@
         <div class="raw-prompt-body">
           <textarea id="rawPrompt" maxlength="5000" placeholder="Paste or write your rough prompt here…"></textarea>
         </div>
-      </div>
 
-      <div class="card options-card">
-        <button class="card-header options-toggle" id="optionsToggle" aria-expanded="true">
-          <span class="card-header-title">Options</span>
-          <span class="options-chevron" id="optionsChevron">▲</span>
+        <button class="options-toggle" id="optionsToggle" aria-expanded="true">
+          <span class="options-toggle-title">Options</span>
+          <span class="options-chevron" id="optionsChevron">▼</span>
         </button>
         <div class="options-body" id="optionsBody">
 
@@ -1594,11 +1642,10 @@
           </div>
 
         </div>
-      </div>
 
-      <div class="cta-container">
-        <button class="cta-btn" id="optimizeBtn" disabled>✦ Optimize prompt</button>
-        <div class="cta-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to optimize</div>
+        <div class="raw-prompt-footer">
+          <button class="cta-btn" id="optimizeBtn" disabled>✦ Optimize prompt</button>
+        </div>
       </div>
     </section>
 
@@ -1606,10 +1653,23 @@
       <div class="card output-card">
         <div class="card-header">
           <span class="card-header-title">Optimized result</span>
-          <div class="view-tabs" id="viewTabs">
-            <button data-view="pretty" class="active">Pretty</button>
-            <button data-view="raw">Raw</button>
-            <button data-view="outline">Outline</button>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="view-tabs" id="viewTabs">
+              <button data-view="pretty" class="active">Pretty</button>
+              <button data-view="raw">Raw</button>
+              <button data-view="outline">Outline</button>
+            </div>
+            <div class="dev-menu-container">
+              <button class="menu-btn" id="devMenuBtn">⋯</button>
+              <div class="dev-menu" id="devMenu">
+                <div class="dev-menu-header">Developer tools</div>
+                <button id="testBenchBtn">⚖ Test it (A/B bench)</button>
+                <button id="diffBtn">⇄ View diff vs raw</button>
+                <button id="previewBtn">👁 Preview compiled prompt</button>
+                <button id="exportBtn">↧ Export (.md / .json)</button>
+                <button id="refineBtn">↻ Refine prompt</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1627,6 +1687,7 @@
           <div id="prettyView" style="display:none;"></div>
           <div id="rawView" class="mono" style="display:none; white-space:pre-wrap; font-size:13px; line-height:1.7;"></div>
           <div id="outlineView" style="display:none;"></div>
+          <button class="optimize-another" id="optimizeAnotherBtn">+ Optimize another prompt</button>
         </div>
 
         <!-- Refinement input container (Phase 5) -->
@@ -1639,20 +1700,8 @@
         </div>
 
         <div class="output-footer">
-          <div class="action-row">
-            <button class="copy-btn" id="copyBtn">⧉ Copy prompt</button>
-            <button class="save-btn" id="saveBtn">☆ Save</button>
-            <button class="menu-btn" id="devMenuBtn">⋯</button>
-            <div class="dev-menu" id="devMenu">
-              <div class="dev-menu-header">Developer tools</div>
-              <button id="testBenchBtn">⚖ Test it (A/B bench)</button>
-              <button id="diffBtn">⇄ View diff vs raw</button>
-              <button id="previewBtn">👁 Preview compiled prompt</button>
-              <button id="exportBtn">↧ Export (.md / .json)</button>
-              <button id="refineBtn">↻ Refine prompt</button>
-            </div>
-          </div>
-          <button class="optimize-another" id="optimizeAnotherBtn">+ Optimize another prompt</button>
+          <button class="copy-btn" id="copyBtn">⧉ Copy prompt</button>
+          <button class="save-btn" id="saveBtn">★ Save</button>
         </div>
       </div>
     </section>
@@ -1879,7 +1928,6 @@
 
       function setOptionsOpen(open) {
         optionsBody.classList.toggle('collapsed', !open);
-        optionsChevron.textContent = open ? '▲' : '▼';
         optionsToggle.setAttribute('aria-expanded', String(open));
       }
 
@@ -2601,7 +2649,7 @@
         saved = false;
         libraryEntryId = null;
         saveBtn.classList.remove('saved');
-        saveBtn.textContent = '☆ Save';
+        saveBtn.textContent = '★ Save';
 
         if (data.model) {
           engineChip.textContent = '● ' + data.model + ' · live';
@@ -2632,7 +2680,7 @@
         if (status !== 'done' || !currentResult) return;
         saved = !saved;
         saveBtn.classList.toggle('saved', saved);
-        saveBtn.textContent = saved ? '★ Saved' : '☆ Save';
+        saveBtn.textContent = saved ? '★ Saved' : '★ Save';
         if (saved) {
           libraryEntryId = addToLibrary(rawPrompt.value, {
             style: state.style,
@@ -3119,7 +3167,7 @@
           libraryEntryId = null;
           saved = false;
           saveBtn.classList.remove('saved');
-          saveBtn.textContent = '☆ Save';
+          saveBtn.textContent = '★ Save';
         }
         renderLibrary();
       }
@@ -3253,7 +3301,7 @@
             saved = false;
             libraryEntryId = null;
             saveBtn.classList.remove('saved');
-            saveBtn.textContent = '☆ Save';
+            saveBtn.textContent = '★ Save';
           }
         }
 
@@ -3585,7 +3633,7 @@
             saved = false;
             libraryEntryId = null;
             saveBtn.classList.remove('saved');
-            saveBtn.textContent = '☆ Save';
+            saveBtn.textContent = '★ Save';
 
             recordHistory(rawPrompt.value.trim(), {
               style: 'refined',
