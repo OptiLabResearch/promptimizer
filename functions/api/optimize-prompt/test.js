@@ -3,7 +3,7 @@ const assert = {
     if (!val) throw new Error(message || "Assertion failed");
   }
 };
-import { ValidationError, resolveProviderConfig, callCompletion, buildOptimizePrompt, buildRefinePassPrompt, parseDelimitedResponse, iterSseEvents } from "../../_lib/optimizer.js";
+import { ValidationError, RateLimitError, resolveProviderConfig, callCompletion, buildOptimizePrompt, buildRefinePassPrompt, parseDelimitedResponse, iterSseEvents, enforceHostedRateLimit } from "../../_lib/optimizer.js";
 
 function makeMockStream(chunks) {
   let index = 0;
@@ -127,6 +127,38 @@ export async function runUnitTests() {
     assert.ok(explanationText === "this is explanation", "Should parse explanation properly when it appears first");
   });
 
+  await runTest("resolveProviderConfig rejects BYOK base_url pointing at private/link-local hosts", async () => {
+    const unsafeUrls = [
+      "http://169.254.169.254/latest/meta-data",
+      "http://127.0.0.1:8080/v1",
+      "http://10.0.0.5/v1",
+      "http://192.168.1.1/v1",
+      "http://172.16.0.1/v1",
+      "http://localhost/v1",
+      "http://metadata.google.internal/v1",
+      "http://[::1]/v1",
+      "ftp://example.com/v1",
+    ];
+    for (const base_url of unsafeUrls) {
+      let errorMsg = "";
+      try {
+        await resolveProviderConfig({ api_key: "key", provider: "custom", base_url, model: "m" }, {});
+      } catch (e) {
+        if (e instanceof ValidationError) errorMsg = e.message;
+      }
+      assert.ok(errorMsg, `Should reject unsafe base_url: ${base_url}`);
+    }
+  });
+
+  await runTest("resolveProviderConfig accepts a safe public BYOK base_url", async () => {
+    const config = await resolveProviderConfig(
+      { api_key: "key", provider: "custom", base_url: "https://api.example.com/v1", model: "m" },
+      {}
+    );
+    assert.ok(config.source === "byo", "Should resolve to the byo source");
+    assert.ok(config.attempts[0].baseUrl === "https://api.example.com/v1", "Should keep the safe base_url");
+  });
+
   await runTest("resolveProviderConfig validation when key is missing and provider not hosted", async () => {
     let errorMsg = "";
     try {
@@ -178,9 +210,11 @@ export async function onRequestPost({ request, env }) {
 
   let config;
   try {
+    if (!String(body.api_key || "").trim()) await enforceHostedRateLimit(env, request);
     config = await resolveProviderConfig(body, env);
   } catch (e) {
     if (e instanceof ValidationError) return json({ ok: false, error: e.message }, 400);
+    if (e instanceof RateLimitError) return json({ ok: false, error: e.message }, 429);
     throw e;
   }
 

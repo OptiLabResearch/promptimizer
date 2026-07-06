@@ -128,6 +128,48 @@ const TECHNIQUE_GUIDELINES = {
 };
 
 export class ValidationError extends Error {}
+export class RateLimitError extends Error {}
+
+const RATE_LIMIT_CACHE_PREFIX = "https://prompt-optimizer.local/ratelimit-";
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+
+// Cheap per-IP abuse guard for requests that spend the site owner's shared
+// hosted API keys (no body.api_key). Uses the same Cache API mechanism as the
+// circuit breaker above, so it needs no extra bindings; fails open if the
+// Cache API isn't available (e.g. local dev) or errors.
+export async function enforceHostedRateLimit(env, request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const windowId = Math.floor(Date.now() / (RATE_LIMIT_WINDOW_SECONDS * 1000));
+  const cacheUrl = `${RATE_LIMIT_CACHE_PREFIX}${ip}-${windowId}`;
+
+  try {
+    if (typeof caches === "undefined" || !caches.default) return;
+    const cache = caches.default;
+    const req = new Request(cacheUrl);
+    const existing = await cache.match(req);
+    let count = 0;
+    if (existing) {
+      const data = await existing.json().catch(() => ({ count: 0 }));
+      count = data.count || 0;
+    }
+    count += 1;
+
+    await cache.put(req, new Response(JSON.stringify({ count }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `max-age=${RATE_LIMIT_WINDOW_SECONDS}`,
+      },
+    }));
+
+    if (count > RATE_LIMIT_MAX_REQUESTS) {
+      throw new RateLimitError("Too many requests. Please wait a minute and try again, or add your own API key in Settings.");
+    }
+  } catch (e) {
+    if (e instanceof RateLimitError) throw e;
+    // Fail open on cache errors so the rate limiter itself never breaks the app.
+  }
+}
 
 export function buildRefinementPrompt(body) {
   const previousPrompt = String(body.previous_prompt || "").trim();
@@ -359,9 +401,16 @@ export function parseDelimitedResponse(rawResponse) {
 const CIRCUIT_CACHE_KEY = "https://prompt-optimizer.local/circuit-breaker-state";
 const localMemoryCache = new Map();
 
-async function getCircuitStatus(provider, model) {
-  const cacheKey = `${provider}:${model}`;
-  
+// Short, non-reversible-in-practice tag distinguishing which pooled key an
+// attempt used, so the circuit breaker mutes only that key, not the whole
+// (provider, model) pair when other keys in the pool are still healthy.
+function keyFingerprint(key) {
+  return key ? key.slice(-6) : "nokey";
+}
+
+async function getCircuitStatus(provider, model, keyTag) {
+  const cacheKey = `${provider}:${model}:${keyTag}`;
+
   if (localMemoryCache.has(cacheKey)) {
     const expires = localMemoryCache.get(cacheKey);
     if (Date.now() < expires) return true;
@@ -383,8 +432,8 @@ async function getCircuitStatus(provider, model) {
   return false;
 }
 
-async function muteModelInCircuit(provider, model, durationSeconds) {
-  const cacheKey = `${provider}:${model}`;
+async function muteModelInCircuit(provider, model, durationSeconds, keyTag) {
+  const cacheKey = `${provider}:${model}:${keyTag}`;
   const expiresAt = Date.now() + (durationSeconds * 1000);
   
   localMemoryCache.set(cacheKey, expiresAt);
@@ -488,6 +537,44 @@ function resolveKey(provider, env) {
   return keys[randomIndex];
 }
 
+// Hosts a custom base_url must never resolve to: loopback, link-local
+// (including the cloud metadata address), and RFC1918 private ranges. This
+// blocks the obvious SSRF/open-relay vectors while still allowing any public
+// OpenAI-compatible API endpoint a user wants to point their own key at.
+function assertSafeBaseUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch (e) {
+    throw new ValidationError("Base URL must be a valid URL.");
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new ValidationError("Base URL must use http or https.");
+  }
+
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (hostname === "localhost" || hostname === "metadata.google.internal") {
+    throw new ValidationError("Base URL may not point at a local or metadata address.");
+  }
+
+  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    const isPrivate =
+      a === 127 || // loopback
+      a === 10 || // 10.0.0.0/8
+      (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
+      (a === 192 && b === 168) || // 192.168.0.0/16
+      (a === 169 && b === 254) || // 169.254.0.0/16 (includes cloud metadata)
+      a === 0;
+    if (isPrivate) {
+      throw new ValidationError("Base URL may not point at a private or link-local address.");
+    }
+  } else if (hostname === "::1" || hostname.startsWith("fe80:") || hostname.startsWith("fc") || hostname.startsWith("fd")) {
+    throw new ValidationError("Base URL may not point at a private or link-local address.");
+  }
+}
+
 // Resolves which provider config to use: the caller's own key (BYO, from the
 // request body) takes priority; otherwise fall back to a shared key from
 // environment secrets (only present on the maintainer's hosted instance).
@@ -507,6 +594,7 @@ export async function resolveProviderConfig(body, env) {
     const model = bodyModel || (preset ? preset.defaultModel : "");
     if (!baseUrl) throw new ValidationError("A base URL is required for a custom provider.");
     if (!model) throw new ValidationError("A model is required.");
+    assertSafeBaseUrl(baseUrl);
     return { attempts: [{ mode, baseUrl, apiKey: bodyApiKey, model, provider: bodyProvider || "custom" }], source: "byo", deadline };
   }
 
@@ -551,8 +639,11 @@ export async function resolveProviderConfig(body, env) {
     if (!preset) return;
 
     const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-    const key = resolveKey(provider, env);
-    if (!key) return;
+    // Bail out early if the provider has no key configured at all, but
+    // otherwise resolve a (possibly pooled) key per model below, so a
+    // rate-limited/bad key on one model attempt doesn't force every other
+    // fallback model for this provider to reuse the same unlucky pick.
+    if (!resolveKey(provider, env)) return;
 
     const rawModels = env[`HOSTED_MODEL_${cleanProviderName}`] || (i === 0 ? env.HOSTED_MODEL : "");
     const models = String(rawModels || "")
@@ -560,12 +651,13 @@ export async function resolveProviderConfig(body, env) {
       .map((m) => m.trim())
       .filter(Boolean);
     if (!models.length && preset.defaultModel) models.push(preset.defaultModel);
-    
+
     for (const model of models) {
       // If the official catalog was fetched successfully and this model is not in it, skip it
       if (catalogs[provider] && !catalogs[provider].includes(model)) {
         continue;
       }
+      const key = resolveKey(provider, env);
       attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model, provider });
     }
   });
@@ -573,7 +665,7 @@ export async function resolveProviderConfig(body, env) {
   // Filter out any attempts that are currently muted in the circuit breaker
   let activeAttempts = [];
   for (const attempt of attempts) {
-    if (!(await getCircuitStatus(attempt.provider, attempt.model))) {
+    if (!(await getCircuitStatus(attempt.provider, attempt.model, keyFingerprint(attempt.apiKey)))) {
       activeAttempts.push(attempt);
     }
   }
@@ -678,7 +770,13 @@ async function executeWithFallback(config, systemPrompt, userText, maxTokens, st
 
       if (!resp.ok) {
         const text = await resp.text().catch(() => "");
-        throw new Error(`Upstream provider error (${resp.status}): ${text.slice(0, 300)}`);
+        console.error(`Upstream provider error (${attempt.provider}/${attempt.model}, ${resp.status}): ${text.slice(0, 300)}`);
+        // Only echo the upstream body back when the caller supplied their own
+        // key (config.source === "byo") — it's their own account's error to
+        // see. For the shared hosted key, the raw body can contain the site
+        // owner's account/org details, so keep the client-facing message generic.
+        const detail = config.source === "byo" ? `: ${text.slice(0, 300)}` : "";
+        throw new Error(`Upstream provider error (${resp.status})${detail}`);
       }
 
       const result = await handler(resp, attempt, resetTimeout, controller.signal);
@@ -694,15 +792,16 @@ async function executeWithFallback(config, systemPrompt, userText, maxTokens, st
         const isAuthError = /error \(401\)|error \(403\)/i.test(e.message || "");
         const isServiceUnavailable = /error \(503\)|error \(500\)/i.test(e.message || "");
 
+        const keyTag = keyFingerprint(attempt.apiKey);
         if (isAuthError) {
           // Mute for 24 hours if key is unauthorized
-          await muteModelInCircuit(attempt.provider, attempt.model, 86400);
+          await muteModelInCircuit(attempt.provider, attempt.model, 86400, keyTag);
         } else if (isRateLimit) {
           // Mute for 1 hour if rate limited
-          await muteModelInCircuit(attempt.provider, attempt.model, 3600);
+          await muteModelInCircuit(attempt.provider, attempt.model, 3600, keyTag);
         } else if (isTimeout || isServiceUnavailable) {
           // Mute for 10 minutes if timed out or service is down
-          await muteModelInCircuit(attempt.provider, attempt.model, 600);
+          await muteModelInCircuit(attempt.provider, attempt.model, 600, keyTag);
         }
       } catch (muteErr) {
         // Fail silently so circuit breaker error doesn't hide the original API error

@@ -1,9 +1,11 @@
 import {
   ValidationError,
+  RateLimitError,
   buildOptimizePrompt,
   parseDelimitedResponse,
   resolveProviderConfig,
   streamCompletion,
+  enforceHostedRateLimit,
 } from "../../_lib/optimizer.js";
 
 export async function onRequestPost({ request, env }) {
@@ -25,10 +27,12 @@ export async function onRequestPost({ request, env }) {
 
   let systemPrompt, userText, config;
   try {
+    if (!String(body.api_key || "").trim()) await enforceHostedRateLimit(env, request);
     ({ systemPrompt, userText } = buildOptimizePrompt(body, rawPrompt));
     config = await resolveProviderConfig(body, env);
   } catch (e) {
     if (e instanceof ValidationError) return json({ ok: false, error: e.message }, 400);
+    if (e instanceof RateLimitError) return json({ ok: false, error: e.message }, 429);
     throw e;
   }
 
@@ -53,7 +57,10 @@ export async function onRequestPost({ request, env }) {
           send("done", { optimized_prompt: optimizedText, explanation: explanationText, model });
         }
       } catch (e) {
-        if (request.signal?.aborted) return;
+        if (request.signal?.aborted) {
+          try { controller.close(); } catch (closeErr) {}
+          return;
+        }
         send("error", { error: e.message || "Optimization failed." });
       }
       controller.close();

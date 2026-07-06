@@ -1,10 +1,12 @@
 import {
   ValidationError,
+  RateLimitError,
   buildOptimizePrompt,
   buildRefinePassPrompt,
   parseDelimitedResponse,
   resolveProviderConfig,
   callCompletion,
+  enforceHostedRateLimit,
 } from "../_lib/optimizer.js";
 
 export async function onRequestGet({ env }) {
@@ -39,10 +41,12 @@ export async function onRequestPost({ request, env }) {
 
   let systemPrompt, userText, config;
   try {
+    if (!String(body.api_key || "").trim()) await enforceHostedRateLimit(env, request);
     ({ systemPrompt, userText } = buildOptimizePrompt(body, rawPrompt));
     config = await resolveProviderConfig(body, env);
   } catch (e) {
     if (e instanceof ValidationError) return json({ ok: false, error: e.message }, 400);
+    if (e instanceof RateLimitError) return json({ ok: false, error: e.message }, 429);
     throw e;
   }
 
