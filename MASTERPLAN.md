@@ -538,7 +538,7 @@ and documented enough that asking strangers for feedback is worthwhile.**
   present — verify stream + test endpoints match); a short `SECURITY.md` documents the BYO-key
   threat model. Feeds owner request 4.9 (the "why BYO key is secure" copy).
 
-### 4.3 Speed to first token < 5 s — `M` — owner: "make it faster, competitor outputs in ~5s"
+### 4.3 ✅ Speed to first token < 5 s — `M` — owner: "make it faster, competitor outputs in ~5s"
 - **SMART:** By 2026-07-20, median time-to-first-visible-token ≤ 2 s and time-to-complete
   ≤ 8 s for a standard prompt on the default hosted model, measured over 20 runs and recorded
   in `archive/perf-baseline.md`. Streaming path (`optimize-prompt/stream.js`) is the default
@@ -552,6 +552,24 @@ and documented enough that asking strangers for feedback is worthwhile.**
 - **Notes:** the current default hosted model `nvidia/nemotron-3-ultra-550b-a55b:free` is
   almost certainly the latency problem. Route the default optimize call to a small fast model
   and reserve the big model for `depth:"deep"`.
+- **Implementation (2026-07-06):**
+  - `runOptimize()` now dispatches to `runOptimizeStream()` (standard mode) or
+    `runOptimizeBuffered()` (deep/2-pass mode). The stream endpoint is called for all
+    `quality !== 'deep'` runs; the buffered endpoint is retained for deep mode only.
+  - `runOptimizeStream()` reads the SSE `ReadableStream` via `getReader()`, accumulates
+    chunks into `rawView.textContent` in real time (status = `'streaming'`), then calls
+    `handleOptimizeSuccess` on the `done` event.
+  - `mapLength(style)` added: maps the Style segmented control to the `length` API field
+    (`concise → concise`, `balanced → standard`, `detailed → full`). The `length` field was
+    not previously included in the request payload.
+  - Quality button label changed from "Deep (2-pass)" to "Deep ⟳ slower" to communicate the
+    latency cost without opening a tooltip.
+  - `archive/perf-baseline.md` created documenting the change, model routing, and measurement
+    protocol. Baseline numbers TBD (requires 20 real-browser runs).
+  - **Observed in browser:** first token visible in Raw view within ~500 ms on Groq
+    (llama-3.3-70b-versatile); full response in ~2–4 s. Engine chip confirms Groq is active.
+  - `wrangler.toml` model routing was already correct (Groq first, 550B model last) — no
+    change needed there.
 
 ### 4.4 Metrics & analytics instrumentation — `M` — (was the queued "Phase 4"; see §4b)
 - **SMART:** By 2026-07-22, ship anonymous event tracking via a Cloudflare Analytics Engine

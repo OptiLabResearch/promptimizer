@@ -1616,7 +1616,7 @@
             <span class="field-label">Quality <span class="info-dot tooltip-trigger" tabindex="0">i<span class="tooltip-bubble" role="tooltip">Standard = one optimization pass. Deep = two passes — the model critiques its own draft and improves it. Slower but better.</span></span></span>
             <div class="segmented" data-group="quality">
               <button data-value="standard" class="active">Standard</button>
-              <button data-value="deep">Deep (2-pass)</button>
+              <button data-value="deep">Deep ⟳ slower</button>
             </div>
           </div>
 
@@ -2255,10 +2255,13 @@
       // ---------- Output body view state ----------
       function renderOutputBody() {
         emptyState.style.display = status === 'idle' ? 'flex' : 'none';
+        // Show skeleton only during buffered load (deep mode); streaming uses rawView directly
         skeletonLoader.style.display = status === 'loading' ? 'flex' : 'none';
-        prettyView.style.display = (status === 'done' && activeView === 'pretty') ? '' : 'none';
-        rawView.style.display = (status === 'done' && activeView === 'raw') ? '' : 'none';
-        outlineView.style.display = (status === 'done' && activeView === 'outline') ? '' : 'none';
+        // During streaming, show the raw view so tokens are visible as they arrive
+        var isStreaming = status === 'streaming';
+        prettyView.style.display = (!isStreaming && status === 'done' && activeView === 'pretty') ? '' : 'none';
+        rawView.style.display = (isStreaming || (status === 'done' && activeView === 'raw')) ? '' : 'none';
+        outlineView.style.display = (!isStreaming && status === 'done' && activeView === 'outline') ? '' : 'none';
       }
 
       // ---------- Pretty / Raw / Outline tab switching ----------
@@ -2586,6 +2589,13 @@
       // ---------- Options mapping (UI values -> API contract) ----------
       function mapTechnique(t) { return t === 'few-shot' ? 'fewshot' : t; }
       function mapTarget(t) { return t === 'small-local' ? 'local' : t; }
+      // Map the style segmented control to the API length field
+      // (style governs structural verbosity/strength; length governs word count)
+      function mapLength(style) {
+        if (style === 'concise') return 'concise';
+        if (style === 'detailed') return 'full';
+        return 'standard'; // 'balanced' and anything else → standard
+      }
 
       // ---------- Run the optimize request ----------
       function runOptimize() {
@@ -2593,10 +2603,7 @@
         if (!promptText) return;
 
         resetEmptyText();
-        status = 'loading';
-        setCtaLoading(true);
         optimizeAnotherBtn.style.display = 'none';
-        renderOutputBody();
 
         var options = {
           style: state.style,
@@ -2608,11 +2615,114 @@
         var payload = {
           prompt: promptText,
           strength: state.style,
+          length: mapLength(state.style),
           depth: state.quality,
           target_model: mapTarget(state.target),
           techniques: state.techniques.map(mapTechnique),
           ...providerFields()
         };
+
+        // Deep mode (2-pass) must use the buffered endpoint; all other modes
+        // use the streaming endpoint so tokens appear as they arrive.
+        var useStream = state.quality !== 'deep';
+
+        if (useStream) {
+          runOptimizeStream(promptText, options, payload);
+        } else {
+          runOptimizeBuffered(promptText, options, payload);
+        }
+      }
+
+      // SSE streaming path — connects to /api/optimize-prompt/stream and
+      // renders tokens into rawView as they arrive, then calls
+      // handleOptimizeSuccess once the 'done' event is received.
+      function runOptimizeStream(promptText, options, payload) {
+        status = 'streaming';
+        setCtaLoading(true);
+        rawView.textContent = '';
+        setActiveView('raw');
+        renderOutputBody();
+
+        var accumulated = '';
+
+        fetch('/api/optimize-prompt/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function (resp) {
+          if (!resp.ok) {
+            return resp.json().then(function (d) {
+              throw new Error((d && d.error) || 'Stream request failed (' + resp.status + ')');
+            }).catch(function (e) {
+              if (e instanceof Error) throw e;
+              throw new Error('Stream request failed (' + resp.status + ')');
+            });
+          }
+
+          var reader = resp.body.getReader();
+          var decoder = new TextDecoder();
+          var buf = '';
+
+          function processChunk() {
+            return reader.read().then(function (result) {
+              if (result.done) return;
+              buf += decoder.decode(result.value, { stream: true });
+
+              // Parse complete SSE message blocks (delimited by \n\n)
+              var offset = 0;
+              while (true) {
+                var end = buf.indexOf('\n\n', offset);
+                if (end === -1) break;
+                var block = buf.slice(offset, end);
+                offset = end + 2;
+
+                var eventLine = '';
+                var dataLine = '';
+                block.split('\n').forEach(function (line) {
+                  if (line.startsWith('event: ')) eventLine = line.slice(7).trim();
+                  if (line.startsWith('data: ')) dataLine = line.slice(6).trim();
+                });
+
+                if (!dataLine) continue;
+                var evt;
+                try { evt = JSON.parse(dataLine); } catch (e) { continue; }
+
+                if (eventLine === 'chunk' && evt.text) {
+                  accumulated += evt.text;
+                  rawView.textContent = accumulated;
+                } else if (eventLine === 'done') {
+                  status = 'done';
+                  setCtaLoading(false);
+                  var data = {
+                    ok: true,
+                    optimized_prompt: evt.optimized_prompt || '',
+                    explanation: evt.explanation || '',
+                    model: evt.model || ''
+                  };
+                  handleOptimizeSuccess(promptText, options, data);
+                  return; // stop reading
+                } else if (eventLine === 'error') {
+                  throw new Error((evt && evt.error) || 'Optimization failed.');
+                }
+              }
+              if (offset > 0) buf = buf.slice(offset);
+
+              return processChunk();
+            });
+          }
+
+          return processChunk();
+        }).catch(function (err) {
+          handleOptimizeError(err);
+        });
+      }
+
+      // Buffered (non-streaming) path — used for depth:"deep" (2-pass critique)
+      // which is not supported on the stream endpoint.
+      function runOptimizeBuffered(promptText, options, payload) {
+        status = 'loading';
+        setCtaLoading(true);
+        renderOutputBody();
 
         fetch('/api/optimize-prompt', {
           method: 'POST',
