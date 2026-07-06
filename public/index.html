@@ -200,7 +200,7 @@
     box-shadow: var(--card-shadow);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible; /* Prevents absolutely positioned tooltips from being clipped */
   }
 
   .card-header {
@@ -212,6 +212,8 @@
     height: 56px;
     box-sizing: border-box;
     border-bottom: 1px solid var(--line);
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
   }
 
   .card-header-title { font-size: 13px; font-weight: 600; }
@@ -300,6 +302,8 @@
     gap: 10px 14px;
     background: var(--panel-inset);
     border-top: 1px solid var(--line);
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
   }
 
   .options-body.collapsed { display: none; }
@@ -732,6 +736,8 @@
     display: flex;
     gap: 8px;
     background: var(--panel);
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
   }
 
   .copy-btn {
@@ -1621,7 +1627,7 @@
           </div>
 
           <div class="field span-2">
-            <span class="field-label">Optimize for</span>
+            <span class="field-label">Optimize for <span class="info-dot tooltip-trigger" tabindex="0">i<span class="tooltip-bubble" role="tooltip">Different models read prompts differently — Claude prefers XML tags, GPT prefers markdown; this tailors the rewrite.</span></span></span>
             <div class="segmented" data-group="target">
               <button data-value="generic" class="active">Generic</button>
               <button data-value="claude">Claude</button>
@@ -1655,7 +1661,7 @@
           <span class="card-header-title">Optimized result</span>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="view-tabs" id="viewTabs">
-              <button data-view="pretty" class="active">Pretty</button>
+              <button data-view="pretty" class="active">Structured</button>
               <button data-view="raw">Raw</button>
               <button data-view="outline">Outline</button>
             </div>
@@ -1673,7 +1679,15 @@
           </div>
         </div>
 
-        <div class="output-body" id="outputBody">
+        <div class="output-body" id="outputBody" style="position: relative;">
+          <!-- Progress Bar & Status (determinate-feel) -->
+          <div class="progress-container" id="progressContainer" style="display:none; padding: 16px; border-bottom: 1px solid var(--line); background: var(--panel-inset, #101116);">
+            <div class="progress-bar-track" style="height: 6px; width: 100%; background: var(--border); border-radius: 3px; overflow: hidden; position: relative;">
+              <div class="progress-bar-fill" id="progressBarFill" style="height: 100%; width: 0%; background: var(--accent); transition: width 0.2s ease; border-radius: 3px;"></div>
+            </div>
+            <div class="progress-status" id="progressStatus" style="font-size: 12px; color: var(--text-soft); margin-top: 8px; font-family: monospace;">Optimizing...</div>
+          </div>
+
           <div class="empty-state" id="emptyState">
             <div class="empty-state-icon">→</div>
             <span id="emptyStateText">Your optimized prompt will appear here.</span>
@@ -1697,6 +1711,10 @@
             <input type="text" id="refineInput" placeholder="Instruct the model on what to change (e.g. 'make it shorter')...">
             <button class="refine-submit-btn" id="refineSubmitBtn">Refine</button>
           </div>
+        </div>
+
+        <div class="stats-strip" id="statsStrip" style="display: none; font-size: 12px; color: var(--text-soft); font-family: monospace; border-top: 1px solid var(--line); padding: 8px 12px; background: var(--panel); text-align: left;">
+          <!-- Content populated dynamically -->
         </div>
 
         <div class="output-footer">
@@ -1776,6 +1794,19 @@
             <option value="xai">xAI</option>
             <option value="custom">Custom (OpenAI-compatible)</option>
           </select>
+        </div>
+        <div class="form-field" id="settingsHostedModelGroup">
+          <label for="settingsHostedModel">Hosted Free Model <span class="info-dot tooltip-trigger" tabindex="0">i<span class="tooltip-bubble" role="tooltip" style="font-weight: normal; text-transform: none; text-align: left; max-width: 280px; letter-spacing: normal; font-size: 12px; line-height: 1.45;">We offer fallback access to these free fallback models. Note that shared keys can be rate-limited. If a model fails or times out, choose another model or bring your own key.</span></span></label>
+          <select class="form-select" id="settingsHostedModel">
+            <option value="">Auto fallback (tries all in order)</option>
+            <option value="groq/llama-3.3-70b-versatile">Groq: Llama 3.3 70B (Fastest & best instruction following)</option>
+            <option value="google/gemini-3.5-flash">Gemini: 3.5 Flash (Super fast & smart)</option>
+            <option value="google/gemini-3.1-flash-lite">Gemini: 3.1 Flash-Lite (Ultra fast, light)</option>
+            <option value="nvidia/stepfun-ai/step-3.7-flash">NVIDIA NIM: Step-3.7-Flash (Fast & structured)</option>
+            <option value="nvidia/minimaxai/minimax-m3">NVIDIA NIM: Minimax-M3 (Highest accuracy)</option>
+            <option value="openrouter/nvidia/nemotron-3-ultra-550b-a55b:free">OpenRouter: Nemotron 3 Ultra 550B (Smart but slow)</option>
+          </select>
+          <span class="form-hint" id="settingsHostedModelNote" style="display:none; margin-top:6px; font-style:italic;"></span>
         </div>
         <div class="form-field" id="settingsApiKeyGroup" style="display:none;">
           <label for="settingsApiKey">API key</label>
@@ -1940,26 +1971,40 @@
         localStorage.setItem(OPTIONS_KEY, String(!isOpen));
       });
 
-      // ---------- Tooltips (hover desktop / tap touch) ----------
-      var tooltipTriggers = document.querySelectorAll('.tooltip-trigger');
-
+      // ---------- Tooltips (hover desktop / tap touch / keyboard) ----------
       function closeAllTooltips(except) {
-        tooltipTriggers.forEach(function (t) {
+        document.querySelectorAll('.tooltip-trigger').forEach(function (t) {
           if (t !== except) t.classList.remove('tooltip-open');
         });
       }
 
-      tooltipTriggers.forEach(function (trigger) {
-        trigger.addEventListener('click', function (e) {
+      document.addEventListener('click', function (e) {
+        if (e.target.tagName === 'A') return; // Allow links inside tooltips to function
+
+        var trigger = e.target.closest('.tooltip-trigger');
+        if (trigger) {
           e.preventDefault();
           e.stopPropagation();
           var isOpen = trigger.classList.contains('tooltip-open');
-          closeAllTooltips();
+          closeAllTooltips(trigger);
           trigger.classList.toggle('tooltip-open', !isOpen);
-        });
+        } else {
+          closeAllTooltips();
+        }
       });
 
-      document.addEventListener('click', function () { closeAllTooltips(); });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          var trigger = e.target.closest('.tooltip-trigger');
+          if (trigger) {
+            e.preventDefault();
+            e.stopPropagation();
+            var isOpen = trigger.classList.contains('tooltip-open');
+            closeAllTooltips(trigger);
+            trigger.classList.toggle('tooltip-open', !isOpen);
+          }
+        }
+      });
 
       // ---------- Raw prompt: counter + CTA enable/disable ----------
       var rawPrompt = document.getElementById('rawPrompt');
@@ -2089,9 +2134,9 @@
       function loadSettings() {
         try {
           var raw = localStorage.getItem(SETTINGS_KEY);
-          return raw ? JSON.parse(raw) : { provider: '', apiKey: '', model: '', baseUrl: '' };
+          return raw ? JSON.parse(raw) : { provider: '', apiKey: '', model: '', baseUrl: '', hostedModelPreset: '' };
         } catch (e) {
-          return { provider: '', apiKey: '', model: '', baseUrl: '' };
+          return { provider: '', apiKey: '', model: '', baseUrl: '', hostedModelPreset: '' };
         }
       }
 
@@ -2101,7 +2146,15 @@
 
       function providerFields() {
         var settings = loadSettings();
-        if (!settings.apiKey || !settings.provider) return {};
+        if (!settings.provider) { // Use shared hosted key (or fallback mode)
+          if (settings.hostedModelPreset) {
+            var parts = settings.hostedModelPreset.split('/');
+            var p = parts[0];
+            var m = parts.slice(1).join('/');
+            return { provider: p, model: m };
+          }
+          return {};
+        }
         var fields = { provider: settings.provider, api_key: settings.apiKey };
         if (settings.model) fields.model = settings.model;
         if (settings.baseUrl) fields.base_url = settings.baseUrl;
@@ -2147,6 +2200,9 @@
       }
 
       var settingsModal = document.getElementById('settingsModal');
+      var settingsHostedModelGroup = document.getElementById('settingsHostedModelGroup');
+      var settingsHostedModel = document.getElementById('settingsHostedModel');
+      var settingsHostedModelNote = document.getElementById('settingsHostedModelNote');
       var settingsProvider = document.getElementById('settingsProvider');
       var settingsApiKey = document.getElementById('settingsApiKey');
       var settingsModel = document.getElementById('settingsModel');
@@ -2156,37 +2212,64 @@
       var settingsBaseUrlGroup = document.getElementById('settingsBaseUrlGroup');
       var settingsFreeKeyHint = document.getElementById('settingsFreeKeyHint');
 
+      var HOSTED_MODEL_DESCRIPTIONS = {
+        '': 'Tries all available free models in order (Groq Llama -> Gemini -> NVIDIA NIM -> OpenRouter) to ensure successful optimization even if some are rate-limited.',
+        'groq/llama-3.3-70b-versatile': 'Llama 3.3 70B: Blazing fast response (~200 tps) with excellent instruction following. Highly recommended.',
+        'google/gemini-3.5-flash': 'Gemini 3.5 Flash: Best overall intelligence for complex prompt formatting and logic.',
+        'google/gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite: Extremely fast response times, best for simple optimizations.',
+        'nvidia/stepfun-ai/step-3.7-flash': 'Step-3.7-Flash: Excellent formatting compliance and structural parsing.',
+        'nvidia/minimaxai/minimax-m3': 'Minimax-M3: Highest instruction-following accuracy in evaluations.',
+        'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free': 'Nemotron 3 Ultra 550B: Smart fallback reasoning, but can be slow.'
+      };
+
       function onProviderChange() {
         var provider = settingsProvider.value;
         var needsBaseUrl = provider === 'custom' || provider === 'cloudflare';
-        settingsBaseUrlGroup.style.display = needsBaseUrl ? 'flex' : 'none';
-        settingsApiKeyGroup.style.display = provider ? 'flex' : 'none';
-        settingsModelGroup.style.display = provider ? 'flex' : 'none';
-        if (provider && !settingsModel.value) {
-          settingsModel.value = (PROVIDER_DEFAULTS[provider] || {}).model || '';
-        }
-
-        // Show specific free key helper links based on selected provider
-        if (provider === 'google') {
-          settingsFreeKeyHint.style.display = 'block';
-          settingsFreeKeyHint.innerHTML = 'Need a key? Get a free API key at <a href="https://aistudio.google.com/" target="_blank" style="color: var(--accent); text-decoration: underline;">Google AI Studio</a> (generous free tier: 15 RPM / 500 RPD).';
-        } else if (provider === 'nvidia') {
-          settingsFreeKeyHint.style.display = 'block';
-          settingsFreeKeyHint.innerHTML = 'Need a key? Get a free trial API key at the <a href="https://build.nvidia.com/" target="_blank" style="color: var(--accent); text-decoration: underline;">NVIDIA Build Portal</a>.';
-        } else if (provider === 'openrouter') {
-          settingsFreeKeyHint.style.display = 'block';
-          settingsFreeKeyHint.innerHTML = 'Need a key? Get a key at <a href="https://openrouter.ai/" target="_blank" style="color: var(--accent); text-decoration: underline;">OpenRouter</a> (many free-tier models are available).';
-        } else if (provider === 'groq') {
-          settingsFreeKeyHint.style.display = 'block';
-          settingsFreeKeyHint.innerHTML = 'Need a key? Get a key at the <a href="https://console.groq.com/" target="_blank" style="color: var(--accent); text-decoration: underline;">Groq Console</a> (generous free tier: 1000 requests/day).';
-        } else if (provider) {
-          settingsFreeKeyHint.style.display = 'block';
-          settingsFreeKeyHint.innerHTML = 'Need a key? Check <a href="https://freellm.net/" target="_blank" style="color: var(--accent); text-decoration: underline;">freellm.net</a> for a current list of free-tier LLM API keys and how to get one.';
-        } else {
+        
+        if (!provider) { // Hosted fallback mode
+          settingsHostedModelGroup.style.display = 'flex';
+          settingsApiKeyGroup.style.display = 'none';
+          settingsModelGroup.style.display = 'none';
+          settingsBaseUrlGroup.style.display = 'none';
           settingsFreeKeyHint.style.display = 'none';
+        } else { // BYOK mode
+          settingsHostedModelGroup.style.display = 'none';
+          settingsBaseUrlGroup.style.display = needsBaseUrl ? 'flex' : 'none';
+          settingsApiKeyGroup.style.display = 'flex';
+          settingsModelGroup.style.display = 'flex';
+          if (!settingsModel.value) {
+            settingsModel.value = (PROVIDER_DEFAULTS[provider] || {}).model || '';
+          }
+
+          // Show specific free key helper links based on selected provider
+          if (provider === 'google') {
+            settingsFreeKeyHint.style.display = 'block';
+            settingsFreeKeyHint.innerHTML = 'Need a key? Get a free API key at <a href="https://aistudio.google.com/" target="_blank" style="color: var(--accent); text-decoration: underline;">Google AI Studio</a> (generous free tier: 15 RPM / 500 RPD).';
+          } else if (provider === 'nvidia') {
+            settingsFreeKeyHint.style.display = 'block';
+            settingsFreeKeyHint.innerHTML = 'Need a key? Get a free trial API key at the <a href="https://build.nvidia.com/" target="_blank" style="color: var(--accent); text-decoration: underline;">NVIDIA Build Portal</a>.';
+          } else if (provider === 'openrouter') {
+            settingsFreeKeyHint.style.display = 'block';
+            settingsFreeKeyHint.innerHTML = 'Need a key? Get a key at <a href="https://openrouter.ai/" target="_blank" style="color: var(--accent); text-decoration: underline;">OpenRouter</a> (many free-tier models are available).';
+          } else if (provider === 'groq') {
+            settingsFreeKeyHint.style.display = 'block';
+            settingsFreeKeyHint.innerHTML = 'Need a key? Get a key at the <a href="https://console.groq.com/" target="_blank" style="color: var(--accent); text-decoration: underline;">Groq Console</a> (generous free tier: 1000 requests/day).';
+          } else if (provider) {
+            settingsFreeKeyHint.style.display = 'block';
+            settingsFreeKeyHint.innerHTML = 'Need a key? Check <a href="https://freellm.net/" target="_blank" style="color: var(--accent); text-decoration: underline;">freellm.net</a> for a current list of free-tier LLM API keys and how to get one.';
+          } else {
+            settingsFreeKeyHint.style.display = 'none';
+          }
         }
       }
+
       settingsProvider.addEventListener('change', onProviderChange);
+
+      settingsHostedModel.addEventListener('change', function () {
+        var val = settingsHostedModel.value;
+        settingsHostedModelNote.style.display = 'block';
+        settingsHostedModelNote.textContent = HOSTED_MODEL_DESCRIPTIONS[val] || '';
+      });
 
       function openSettings() {
         var settings = loadSettings();
@@ -2194,6 +2277,12 @@
         settingsApiKey.value = settings.apiKey || '';
         settingsModel.value = settings.model || '';
         settingsBaseUrl.value = settings.baseUrl || '';
+        settingsHostedModel.value = settings.hostedModelPreset || '';
+
+        var val = settingsHostedModel.value;
+        settingsHostedModelNote.style.display = 'block';
+        settingsHostedModelNote.textContent = HOSTED_MODEL_DESCRIPTIONS[val] || '';
+
         onProviderChange();
         settingsModal.classList.add('open');
         settingsModal.setAttribute('aria-hidden', 'false');
@@ -2218,7 +2307,8 @@
           provider: provider,
           apiKey: provider ? settingsApiKey.value.trim() : '',
           model: provider ? settingsModel.value.trim() : '',
-          baseUrl: needsBaseUrl ? settingsBaseUrl.value.trim() : ''
+          baseUrl: needsBaseUrl ? settingsBaseUrl.value.trim() : '',
+          hostedModelPreset: provider ? '' : settingsHostedModel.value
         });
         refreshEngineChip();
         closeSettings();
@@ -2237,6 +2327,145 @@
       var activeView = 'pretty';
       var currentResult = null; // { optimized_prompt, explanation, model }
       var libraryEntryId = null;
+
+      var optimizeStartTime = 0;
+      var progressInterval = null;
+      var progressPercent = 0;
+
+      function startProgressBar() {
+        var progressContainer = document.getElementById('progressContainer');
+        var progressBarFill = document.getElementById('progressBarFill');
+        var progressStatus = document.getElementById('progressStatus');
+        var statsStrip = document.getElementById('statsStrip');
+        
+        statsStrip.style.display = 'none';
+        progressContainer.style.display = 'block';
+        progressPercent = 0;
+        progressBarFill.style.width = '0%';
+        progressStatus.textContent = 'Initializing request...';
+        optimizeStartTime = Date.now();
+        
+        if (progressInterval) clearInterval(progressInterval);
+        
+        progressInterval = setInterval(function() {
+          var elapsed = (Date.now() - optimizeStartTime) / 1000;
+          
+          if (progressPercent < 30) {
+            progressPercent += 6;
+          } else if (progressPercent < 75) {
+            progressPercent += (75 - progressPercent) * 0.15;
+          } else if (progressPercent < 95) {
+            progressPercent += (95 - progressPercent) * 0.05;
+          }
+          
+          progressBarFill.style.width = progressPercent.toFixed(1) + '%';
+          progressStatus.textContent = 'Optimizing... ' + elapsed.toFixed(1) + 's (' + Math.round(progressPercent) + '%)';
+        }, 200);
+      }
+
+      function finishProgressBar() {
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+        var progressContainer = document.getElementById('progressContainer');
+        var progressBarFill = document.getElementById('progressBarFill');
+        var progressStatus = document.getElementById('progressStatus');
+        if (progressContainer) {
+          progressBarFill.style.width = '100%';
+          var elapsed = (Date.now() - optimizeStartTime) / 1000;
+          progressStatus.textContent = 'Optimization complete in ' + elapsed.toFixed(1) + 's!';
+          setTimeout(function() {
+            progressContainer.style.display = 'none';
+          }, 1000);
+        }
+      }
+
+      function failProgressBar() {
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+        var progressContainer = document.getElementById('progressContainer');
+        var progressStatus = document.getElementById('progressStatus');
+        if (progressContainer) {
+          progressStatus.textContent = 'Optimization failed.';
+          setTimeout(function() {
+            progressContainer.style.display = 'none';
+          }, 2000);
+        }
+      }
+
+      function estimateTokens(text) {
+        if (!text) return 0;
+        return Math.round(text.length / 4);
+      }
+
+      function showStats(data, elapsed) {
+        var statsStrip = document.getElementById('statsStrip');
+        if (!statsStrip || !data) return;
+
+        // Token count
+        var totalTokens = 0;
+        var isEstimated = false;
+        
+        if (data.usage && (data.usage.total_tokens || (data.usage.prompt_tokens && data.usage.completion_tokens))) {
+          totalTokens = data.usage.total_tokens || (data.usage.prompt_tokens + data.usage.completion_tokens);
+        } else {
+          var promptLength = rawPrompt.value ? rawPrompt.value.length : 0;
+          var optLength = data.optimized_prompt ? data.optimized_prompt.length : 0;
+          totalTokens = Math.round((promptLength + optLength) / 4);
+          isEstimated = true;
+        }
+
+        // Cost estimation
+        var costText = '';
+        var settings = loadSettings();
+        var model = data.model || settings.model || 'default';
+        var isFree = false;
+
+        var isHosted = !settings.apiKey || !settings.provider;
+        
+        if (isHosted || model.toLowerCase().indexOf('free') !== -1 || model.toLowerCase().indexOf(':free') !== -1) {
+          isFree = true;
+          costText = 'Free ' + (isHosted ? '(hosted)' : '(free tier)');
+        } else {
+          var pricePerM = 1.0; // default $1.00 per M tokens
+          var lower = model.toLowerCase();
+          
+          if (lower.indexOf('gpt-5.5') !== -1 || lower.indexOf('gpt-4o') !== -1 || lower.indexOf('gpt-4') !== -1) {
+            pricePerM = 11.25;
+          } else if (lower.indexOf('gpt-5.4-mini') !== -1 || lower.indexOf('gpt-4o-mini') !== -1) {
+            pricePerM = 1.69;
+          } else if (lower.indexOf('gpt-5.4-nano') !== -1) {
+            pricePerM = 0.46;
+          } else if (lower.indexOf('gemini-3.5-flash') !== -1 || lower.indexOf('gemini-2.5-flash') !== -1) {
+            pricePerM = 3.38;
+          } else if (lower.indexOf('gemini-1.5-flash') !== -1 || lower.indexOf('gemini-3.1-flash-lite') !== -1 || lower.indexOf('gemini-flash') !== -1) {
+            pricePerM = 0.56;
+          } else if (lower.indexOf('qwen') !== -1 && lower.indexOf('max') !== -1) {
+            pricePerM = 3.75;
+          } else if (lower.indexOf('minimax') !== -1 || lower.indexOf('m3') !== -1) {
+            pricePerM = 0.53;
+          } else if (lower.indexOf('nemotron') !== -1 && lower.indexOf('ultra') !== -1) {
+            pricePerM = 1.18;
+          } else if (lower.indexOf('deepseek') !== -1) {
+            pricePerM = 0.18;
+          } else if (lower.indexOf('claude') !== -1) {
+            pricePerM = 8.0;
+          } else if (lower.indexOf('llama-3.3') !== -1 || lower.indexOf('llama-3.1') !== -1) {
+            pricePerM = 0.20;
+          }
+          
+          var calculatedCost = (totalTokens / 1000000) * pricePerM;
+          costText = '$' + calculatedCost.toFixed(4);
+        }
+
+        var tokenLabel = (isEstimated ? '~' : '') + totalTokens + ' tokens';
+        var modelLabel = data.model ? (' · model: ' + data.model) : '';
+        statsStrip.innerHTML = '⏱ ' + elapsed.toFixed(1) + ' s · ' + tokenLabel + ' · ' + costText + modelLabel;
+        statsStrip.style.display = 'block';
+      }
 
       var emptyState = document.getElementById('emptyState');
       var emptyStateText = document.getElementById('emptyStateText');
@@ -2603,6 +2832,7 @@
         if (!promptText) return;
 
         resetEmptyText();
+        startProgressBar();
         optimizeAnotherBtn.style.display = 'none';
 
         var options = {
@@ -2741,6 +2971,8 @@
       }
 
       function handleOptimizeSuccess(promptText, options, data) {
+        finishProgressBar();
+        var elapsed = (Date.now() - optimizeStartTime) / 1000;
         currentResult = data;
         status = 'done';
         setCtaLoading(false);
@@ -2766,10 +2998,13 @@
           engineChip.classList.remove('offline');
         }
 
+        showStats(data, elapsed);
         recordHistory(promptText, options, data);
       }
 
       function handleOptimizeError(err) {
+        failProgressBar();
+        document.getElementById('statsStrip').style.display = 'none';
         status = 'idle';
         setCtaLoading(false);
         renderOutputBody();
@@ -2818,6 +3053,7 @@
         optimizeAnotherBtn.style.display = 'none';
         setActiveView('pretty');
         resetEmptyText();
+        document.getElementById('statsStrip').style.display = 'none';
         renderOutputBody();
         updateInputState();
         rawPrompt.focus();
@@ -3545,7 +3781,7 @@
 
           var title = document.createElement('div');
           title.className = 'placeholder-inputs-title';
-          title.textContent = 'Fill Placeholders';
+          title.innerHTML = 'Fill Placeholders <span class="info-dot tooltip-trigger" tabindex="0" style="margin-left: 6px;">i<span class="tooltip-bubble" role="tooltip" style="font-weight: normal; text-transform: none; text-align: left; max-width: 250px;">{{like_this}} marks a blank you fill in later — reuse the same prompt with different inputs without rewriting it. <a href="#manual" style="color: var(--accent); text-decoration: underline;">Learn more</a></span></span>';
           container.appendChild(title);
 
           var grid = document.createElement('div');

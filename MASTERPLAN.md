@@ -627,14 +627,14 @@ and "I'd use this daily." Re-order against 4.6 findings before starting.
   Optimize; verified no reflow/overlap at desktop, tablet, phone; keyboard tab-order still
   sane.
 
-### 5.2 Rename the "Pretty" output tab — `S` — owner: "more serious / professional sounding"
+### 5.2 ✅ Rename the "Pretty" output tab — `S` — owner: "more serious / professional sounding"
 - **SMART:** By 2026-07-30, rename the `pretty` view label (keep the `data-view="pretty"` hook
   or migrate it cleanly). Chosen replacement: **"Structured"** (pairs naturally with the
   existing "Raw" and "Outline" tabs). Update all three tab labels for consistency.
 - **Done when:** label reads "Structured"; no dangling references to "Pretty" in UI copy; docs
   (4.5) use the new name.
 
-### 5.3 Free-model dropdown — `M` — owner: "dropdown to choose between the free models"
+### 5.3 ✅ Free-model dropdown — `M` — owner: "dropdown to choose between the free models"
 - **SMART:** By 2026-08-06, add a curated **"Free model"** picker in Settings (and/or the
   engine pill) listing the known-good free options (OpenRouter `:free` tiers, NVIDIA NIM,
   Gemini free) with a one-line quality/speed note each, defaulting to the fast one chosen in
@@ -643,7 +643,7 @@ and "I'd use this daily." Re-order against 4.6 findings before starting.
   falls back gracefully if a free endpoint 429s (the fallback plumbing already exists in
   `resolveProviderConfig`). Complements the "recommended models" docs (4.5.3).
 
-### 5.4 Info tooltips: target model + variables — `S` — owner: "why does target model matter" / "I don't understand variables"
+### 5.4 ✅ Info tooltips: target model + variables — `S` — owner: "why does target model matter" / "I don't understand variables"
 - **SMART:** By 2026-07-31, add an `(i)` tooltip to the target-model chips ("Different models
   read prompts differently — Claude prefers XML tags, GPT prefers markdown; this tailors the
   rewrite") and to the variables/placeholder feature ("`{{like_this}}` marks a blank you fill
@@ -652,7 +652,7 @@ and "I'd use this daily." Re-order against 4.6 findings before starting.
   only); variables tooltip links to the 4.5.4 manual section. Pairs with docs to fully resolve
   the owner's confusion.
 
-### 5.5 Progress bar + time + token/cost readout — `M` — owner: "progress bar, time taken, tokens cost"
+### 5.5 ✅ Progress bar + time + token/cost readout — `M` — owner: "progress bar, time taken, tokens cost"
 - **SMART:** By 2026-08-10, show a determinate-feel progress indicator during optimize, and on
   completion display **elapsed time (s)** and **token usage** (prompt+completion; use provider
   usage fields when returned, else the chars/4 estimate already in the app), plus an estimated

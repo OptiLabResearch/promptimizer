@@ -51,7 +51,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   try {
-    let { content, truncated, model } = await callCompletion(config, systemPrompt, userText, 4000, request.signal);
+    let { content, truncated, model, usage } = await callCompletion(config, systemPrompt, userText, 4000, request.signal);
     if (truncated) {
       return json(
         { ok: false, error: "The model's response was cut off before it finished. Try a shorter prompt or a different model." },
@@ -74,12 +74,17 @@ export async function onRequestPost({ request, env }) {
         optimizedText = secondParsed.optimizedText;
         explanationText = secondParsed.explanationText;
         model = secondResult.model;
+        if (secondResult.usage) {
+          if (!usage) usage = { prompt_tokens: 0, completion_tokens: 0 };
+          usage.prompt_tokens = (usage.prompt_tokens || 0) + (secondResult.usage.prompt_tokens || 0);
+          usage.completion_tokens = (usage.completion_tokens || 0) + (secondResult.usage.completion_tokens || 0);
+        }
       } catch (refineError) {
         console.error("Second critique/refinement pass failed, falling back to first-pass result:", refineError);
       }
     }
 
-    return json({ ok: true, optimized_prompt: optimizedText, explanation: explanationText, model });
+    return json({ ok: true, optimized_prompt: optimizedText, explanation: explanationText, model, usage });
   } catch (e) {
     return json({ ok: false, error: e.message || "Optimization failed." }, 500);
   }

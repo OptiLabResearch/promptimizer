@@ -44,7 +44,7 @@ export async function onRequestPost({ request, env }) {
       };
       const fullText = [];
       try {
-        const { truncated, model } = await streamCompletion(config, systemPrompt, userText, 4000, (piece) => {
+        const { truncated, model, usage } = await streamCompletion(config, systemPrompt, userText, 4000, (piece) => {
           fullText.push(piece);
           send("chunk", { text: piece });
         }, request.signal);
@@ -54,7 +54,7 @@ export async function onRequestPost({ request, env }) {
           });
         } else {
           const { optimizedText, explanationText } = parseDelimitedResponse(fullText.join(""));
-          send("done", { optimized_prompt: optimizedText, explanation: explanationText, model });
+          send("done", { optimized_prompt: optimizedText, explanation: explanationText, model, usage });
         }
       } catch (e) {
         if (request.signal?.aborted) {

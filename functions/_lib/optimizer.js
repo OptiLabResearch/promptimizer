@@ -688,6 +688,10 @@ export async function resolveProviderConfig(body, env) {
     if (!models.length && preset.defaultModel) models.push(preset.defaultModel);
 
     for (const model of models) {
+      // If the client requested a specific model for this hosted provider, skip other models
+      if (bodyModel && bodyModel !== model) {
+        continue;
+      }
       // If the official catalog was fetched successfully and this model is not in it, skip it
       if (catalogs[provider] && !catalogs[provider].includes(model)) {
         continue;
@@ -753,7 +757,7 @@ function prepareRequest(attempt, systemPrompt, userText, maxTokens, stream = fal
         messages,
         temperature: 0.2,
         max_tokens: maxTokens,
-        ...(stream ? { stream: true } : {}),
+        ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}),
       },
     };
   }
@@ -856,17 +860,24 @@ export async function callCompletion(config, systemPrompt, userText, maxTokens =
     const data = await resp.json();
     let content = "";
     let truncated = false;
+    let usage = data.usage || null;
 
     if (attempt.mode === "anthropic") {
       content = (data.content || []).map((b) => b.text || "").join("").trim();
       truncated = data.stop_reason === "max_tokens";
+      if (data.usage) {
+        usage = {
+          prompt_tokens: data.usage.input_tokens || 0,
+          completion_tokens: data.usage.output_tokens || 0
+        };
+      }
     } else {
       const choice = (data.choices || [])[0] || {};
       content = String(choice.message?.content || "").trim();
       truncated = String(choice.finish_reason || "") === "length";
     }
 
-    return { content, truncated, model: attempt.model };
+    return { content, truncated, model: attempt.model, usage };
   });
 }
 
@@ -874,6 +885,7 @@ export async function streamCompletion(config, systemPrompt, userText, maxTokens
   return executeWithFallback(config, systemPrompt, userText, maxTokens, true, signal, async (resp, attempt, resetTimeout, executionSignal) => {
     if (!resp.body) throw new Error("Response body is null");
     let truncated = false;
+    let usage = null;
 
     for await (const event of iterSseEvents(resp.body, executionSignal)) {
       resetTimeout();
@@ -885,7 +897,21 @@ export async function streamCompletion(config, systemPrompt, userText, maxTokens
         continue;
       }
 
+      if (data.usage) {
+        usage = data.usage;
+      }
+
       if (attempt.mode === "anthropic") {
+        if (data.type === "message_start" && data.message?.usage) {
+          usage = {
+            prompt_tokens: data.message.usage.input_tokens || 0,
+            completion_tokens: data.message.usage.output_tokens || 0
+          };
+        }
+        if (data.type === "message_delta" && data.usage) {
+          if (!usage) usage = { prompt_tokens: 0, completion_tokens: 0 };
+          usage.completion_tokens = data.usage.output_tokens || 0;
+        }
         if (data.type === "content_block_delta" && data.delta?.text) {
           onChunk(data.delta.text);
         }
@@ -902,7 +928,7 @@ export async function streamCompletion(config, systemPrompt, userText, maxTokens
       }
     }
 
-    return { truncated, model: attempt.model };
+    return { truncated, model: attempt.model, usage };
   });
 }
 
