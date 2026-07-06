@@ -469,6 +469,25 @@ async function fetchActiveModelsForProvider(provider, baseUrl, apiKey) {
   return null;
 }
 
+function resolveKey(provider, env) {
+  const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const rawKey = env[`${cleanProviderName}_API_KEY`] || 
+                 env[`${cleanProviderName}_KEY`] ||
+                 (provider === "nvidia" ? env.NVIDIA_API_KEY :
+                  provider === "openrouter" ? env.OPENROUTER_API_KEY :
+                  provider === "google" ? env.GOOGLE_API_KEY : undefined);
+
+  if (!rawKey) return null;
+
+  // Split by comma in case of key pooling (e.g. key1,key2,key3)
+  const keys = rawKey.split(",").map(k => k.trim()).filter(Boolean);
+  if (keys.length === 0) return null;
+
+  // Pick a random key from the pool
+  const randomIndex = Math.floor(Math.random() * keys.length);
+  return keys[randomIndex];
+}
+
 // Resolves which provider config to use: the caller's own key (BYO, from the
 // request body) takes priority; otherwise fall back to a shared key from
 // environment secrets (only present on the maintainer's hosted instance).
@@ -510,12 +529,7 @@ export async function resolveProviderConfig(body, env) {
     const preset = PROVIDER_PRESETS[provider];
     if (!preset || !preset.baseUrl || provider === "google") return null;
     
-    const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-    const key = env[`${cleanProviderName}_API_KEY`] || 
-                env[`${cleanProviderName}_KEY`] ||
-                (provider === "nvidia" ? env.NVIDIA_API_KEY :
-                 provider === "openrouter" ? env.OPENROUTER_API_KEY : undefined);
-                 
+    const key = resolveKey(provider, env);
     if (key) {
       const activeList = await fetchActiveModelsForProvider(provider, preset.baseUrl, key);
       return { provider, activeList };
@@ -536,15 +550,7 @@ export async function resolveProviderConfig(body, env) {
     const preset = PROVIDER_PRESETS[provider];
     if (!preset) return;
 
-    // Extensible API Key resolution:
-    // e.g. opencode-go -> env.OPENCODE_GO_API_KEY
-    const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-    const key = env[`${cleanProviderName}_API_KEY`] || 
-                env[`${cleanProviderName}_KEY`] ||
-                (provider === "nvidia" ? env.NVIDIA_API_KEY :
-                 provider === "openrouter" ? env.OPENROUTER_API_KEY :
-                 provider === "google" ? env.GOOGLE_API_KEY : undefined);
-                 
+    const key = resolveKey(provider, env);
     if (!key) return;
 
     const rawModels = env[`HOSTED_MODEL_${cleanProviderName}`] || (i === 0 ? env.HOSTED_MODEL : "");
