@@ -18,7 +18,7 @@ export const PROVIDER_PRESETS = {
   google: {
     label: "Google Gemini",
     mode: "chat",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     defaultModel: "gemini-3-5-flash",
   },
   openai: {
@@ -679,6 +679,7 @@ async function executeWithFallback(config, systemPrompt, userText, maxTokens, st
         const isTimeout = e.name === "AbortError" || /timeout|abort/i.test(e.message || "");
         const isRateLimit = /error \(429\)/i.test(e.message || "");
         const isAuthError = /error \(401\)|error \(403\)/i.test(e.message || "");
+        const isServiceUnavailable = /error \(503\)|error \(500\)/i.test(e.message || "");
 
         if (isAuthError) {
           // Mute for 24 hours if key is unauthorized
@@ -686,8 +687,8 @@ async function executeWithFallback(config, systemPrompt, userText, maxTokens, st
         } else if (isRateLimit) {
           // Mute for 1 hour if rate limited
           await muteModelInCircuit(attempt.provider, attempt.model, 3600);
-        } else if (isTimeout) {
-          // Mute for 10 minutes if timed out
+        } else if (isTimeout || isServiceUnavailable) {
+          // Mute for 10 minutes if timed out or service is down
           await muteModelInCircuit(attempt.provider, attempt.model, 600);
         }
       } catch (muteErr) {
