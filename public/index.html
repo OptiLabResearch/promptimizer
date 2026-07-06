@@ -1068,6 +1068,9 @@
     transform: translateY(8px);
     transition: transform 0.2s ease-out;
   }
+  #settingsModal .modal-panel {
+    overflow: visible;
+  }
   .modal-scrim.open .modal-panel { transform: translateY(0); }
 
   .modal-header {
@@ -1570,6 +1573,111 @@
     .page-footer { flex-direction: column; align-items: flex-start; }
     .bench-panel { width: 100%; }
   }
+
+  /* ---------- Guide Modal & Content Styles ---------- */
+  .guide-tab-btn {
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .guide-tab-btn:hover {
+    background: var(--panel-inset);
+    color: var(--text);
+  }
+  .guide-tab-btn.active {
+    background: var(--accent-tint);
+    color: var(--accent);
+  }
+  .guide-content-container h1 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: var(--text);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+  }
+  .guide-content-container h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 18px;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  .guide-content-container h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .guide-content-container p {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: var(--text-mid);
+    font-size: 13.5px;
+  }
+  .guide-content-container ul, .guide-content-container ol {
+    margin-top: 0;
+    margin-bottom: 14px;
+    padding-left: 20px;
+    color: var(--text-mid);
+    font-size: 13.5px;
+  }
+  .guide-content-container li {
+    margin-bottom: 6px;
+  }
+  .guide-content-container code {
+    font-family: var(--font-mono);
+    background: var(--panel-inset);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 11.5px;
+    color: var(--accent);
+  }
+  .guide-content-container pre {
+    background: var(--panel-inset);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+    margin-bottom: 14px;
+  }
+  .guide-content-container pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text);
+  }
+  .guide-content-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  .guide-content-container th, .guide-content-container td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    font-size: 12.5px;
+    text-align: left;
+  }
+  .guide-content-container th {
+    background: var(--panel-inset);
+    font-weight: 600;
+  }
+  #rawPrompt.dragover {
+    background: var(--accent-tint);
+    outline: 2px dashed var(--accent);
+    outline-offset: -4px;
+    border-radius: 0 0 12px 12px;
+  }
 </style>
 </head>
 <body>
@@ -1581,6 +1689,7 @@
     </div>
     <div class="topbar-actions">
       <span class="engine-chip mono" id="engineChip">● ready</span>
+      <button class="btn-ghost" id="guideBtn">📖 Guide</button>
       <button class="btn-ghost" id="libraryBtn">★ Library</button>
       <button class="btn-ghost" id="historyBtn">↺ History</button>
       <button class="btn-ghost" id="apiBtn">⚙ API</button>
@@ -1729,10 +1838,10 @@
   <footer class="page-footer">
     <span>Prompt Optimizer · open source</span>
     <div class="footer-links">
-      <a href="#">How it works</a>
-      <a href="#">Methodology</a>
-      <a href="#">Features</a>
-      <a href="#">Why this exists</a>
+      <a href="#" id="footerHowItWorks">How it works</a>
+      <a href="#" id="footerMethodology">Methodology</a>
+      <a href="#" id="footerFeatures">Features</a>
+      <a href="#" id="footerWhyThisExists">Why this exists</a>
       <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
       <a href="#" class="feedback-pill" id="feedbackLink">💬 Give feedback</a>
     </div>
@@ -1783,7 +1892,7 @@
         <div class="form-field">
           <label for="settingsProvider">Provider</label>
           <select class="form-select" id="settingsProvider">
-            <option value="">Use shared hosted key (if available)</option>
+            <option value="" selected>Bring your own API key</option>
             <option value="google">Gemini</option>
             <option value="openrouter">OpenRouter</option>
             <option value="nvidia">NVIDIA</option>
@@ -1793,6 +1902,7 @@
             <option value="cloudflare">Cloudflare Workers AI</option>
             <option value="xai">xAI</option>
             <option value="custom">Custom (OpenAI-compatible)</option>
+            <option value="hosted">Use shared hosted key (if available)</option>
           </select>
         </div>
         <div class="form-field" id="settingsHostedModelGroup">
@@ -1821,6 +1931,16 @@
         <div class="form-field" id="settingsBaseUrlGroup" style="display:none;">
           <label for="settingsBaseUrl">Base URL</label>
           <input class="form-input" type="text" id="settingsBaseUrl" placeholder="https://your-endpoint/v1">
+        </div>
+
+        <div class="form-field" id="settingsKeyHelp" style="margin-top: 10px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 12px;">
+          <label style="font-weight: 600; color: var(--text-mid); margin-bottom: 4px;">Where do I get a key?</label>
+          <div style="background: var(--panel-inset); border: 1px solid var(--border); border-radius: 8px; padding: 10px; line-height: 1.45; color: var(--text-mid); margin-bottom: 8px;">
+            To find and get free API keys, visit <a href="https://freellm.net/" target="_blank" style="color: var(--accent); text-decoration: underline; font-weight: 600;">freellm.net</a>. It is updated daily with all the free keys available online, ranked by quality, and includes step-by-step guides on how to acquire them.
+          </div>
+          <div style="background: var(--panel-inset); border: 1px solid var(--border); border-radius: 8px; padding: 10px; line-height: 1.45; color: var(--text-mid);">
+            <strong>Security Notice:</strong> Your key is stored only in this browser and sent directly to the provider — never to our server or logs. Read the full <a href="#" id="settingsGoToSecurity" style="color: var(--accent); text-decoration: underline; font-weight: 600;">Security FAQ</a>.
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1898,6 +2018,212 @@
       <div class="modal-footer">
         <button class="modal-btn modal-btn-secondary" id="feedbackCancel">Cancel</button>
         <button class="modal-btn modal-btn-primary" id="feedbackSend">Send feedback</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guide Modal -->
+  <div class="modal-scrim" id="guideModal" role="dialog" aria-modal="true" aria-label="User Guide" aria-hidden="true">
+    <div class="modal-panel" style="width: 800px; max-width: 100%;">
+      <div class="modal-header">
+        <span class="modal-title">📖 User Guide</span>
+        <button class="modal-close" id="guideClose" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: row; gap: 0; min-height: 480px; max-height: 70vh; padding: 0;">
+        <!-- Left tabs sidebar -->
+        <div class="guide-tabs" style="width: 200px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; padding: 16px 12px; background: var(--panel-inset); flex-shrink: 0;">
+          <button class="guide-tab-btn active" data-guide-tab="why">Why Prompt Optimizer</button>
+          <button class="guide-tab-btn" data-guide-tab="methodology">Methodology</button>
+          <button class="guide-tab-btn" data-guide-tab="models">Recommended Models</button>
+          <button class="guide-tab-btn" data-guide-tab="manual">App Manual</button>
+          <button class="guide-tab-btn" data-guide-tab="faq">FAQ &amp; Security</button>
+        </div>
+        <!-- Right content view -->
+        <div class="guide-content-container" style="flex-grow: 1; padding: 20px 24px; overflow-y: auto; font-size: 14px; line-height: 1.6;">
+          <div class="guide-tab-content" id="guideTab_why">
+            <h1>Why Prompt Optimizer Exists &amp; Who It's For</h1>
+            <p>Prompt Optimizer is designed to bridge the gap between human intent and AI execution. Writing prompts that get consistent, high-quality results from large language models (LLMs) is difficult and counter-intuitive. This tool automates that process using modern prompt-engineering principles.</p>
+
+            <h2>Who it is for</h2>
+            <ul>
+              <li><strong>Solo Builders &amp; Developers:</strong> Quickly draft production-grade system prompts and templates for applications without manual formatting trial-and-error.</li>
+              <li><strong>Semi-Technical Product Managers:</strong> Define clear instruction sets, boundaries, and acceptance criteria for AI features in a structured way.</li>
+              <li><strong>AI Enthusiasts &amp; Power Users:</strong> Learn best practices in prompt engineering by analyzing how the optimizer restructures inputs and reviewing the inline explanations of changes.</li>
+            </ul>
+
+            <h2>What job it does</h2>
+            <p>Prompt Optimizer takes a rough, conversational, or disorganized prompt and transforms it into a structured, highly reliable instruction set tailored for the LLM of your choice.</p>
+            <p>It implements:</p>
+            <ul>
+              <li>Clean sectioning (Role, Context, Task, Constraints, Output Format).</li>
+              <li>Interactive variables (<code>{{like_this}}</code>) for reusability.</li>
+              <li>Side-by-side comparison (Test Bench) to immediately verify performance improvements.</li>
+            </ul>
+
+            <h2>When NOT to use it</h2>
+            <ul>
+              <li><strong>Simple Conversations:</strong> For quick chat tasks, questions, or brainstorming where you just want a quick answer, standard prompting in ChatGPT or Gemini is faster.</li>
+              <li><strong>Creative Writing:</strong> If you want highly stylistic, unstructured creative prose, the strict constraints and structured formatting of the optimizer may overly restrict the model's creative variance.</li>
+              <li><strong>One-off Basic Tasks:</strong> Simple commands like "summarize this text" do not require the overhead of a structured prompt template.</li>
+            </ul>
+          </div>
+          <div class="guide-tab-content" id="guideTab_methodology" style="display: none;">
+            <h1>Methodology: How to Prompt-Optimize</h1>
+            <p>Prompt Optimizer applies a strict set of 2026-era prompt-engineering rules to rewrite prompts. These guidelines are compiled directly from research by Anthropic, OpenAI, and Google.</p>
+
+            <h2>Core Optimization Principles</h2>
+            <ol>
+              <li><strong>Outcome-First Architecture</strong><br>Define what "done" looks like rather than micromanaging every step. Specify the expected outcome, success criteria, hard constraints, and output shape. Avoid prescribing procedures unless a compliance framework or fixed pipeline strictly requires it.</li>
+              <li><strong>Structured Anatomy</strong><br>Organize the prompt into clearly labeled sections using markdown <code>##</code> headers:
+                <ul>
+                  <li><code>## Role</code>: Define the persona and baseline capabilities.</li>
+                  <li><code>## Context</code>: Set the background information and domain.</li>
+                  <li><code>## Task</code>: Detail the primary objective.</li>
+                  <li><code>## Constraints</code>: Establish hard boundaries and rules.</li>
+                  <li><code>## Output Format</code>: Dictate the exact response structure.</li>
+                </ul>
+              </li>
+              <li><strong>Data/Instruction Separation</strong><br>Delineate input data and reference documents clearly from instructions using XML tags (e.g., <code>&lt;document&gt;</code>, <code>&lt;example&gt;</code>) or markdown blockquotes. Keep reference materials at the top, and put query and instructions at the bottom.</li>
+              <li><strong>Output Contracts</strong><br>Instead of soft requests like "be concise" or "output JSON", write strict format specifications. Provide explicit schemas, templates, or hard limits (e.g., "Output ≤ 3 bullet points").</li>
+              <li><strong>Decision Rules Over Absolutes</strong><br>Reserve words like "ALWAYS" and "NEVER" for absolute system invariants. For typical judgment calls, use conditional logic (e.g., "If X is present, perform Y; otherwise, skip to Z").</li>
+              <li><strong>High Signal, Low Noise</strong><br>Eliminate conversational boilerplate, polite filler, and generic statements (e.g., "Please act as a world-class expert"). Every token in the prompt must serve a functional purpose.</li>
+              <li><strong>Negative Constraints &amp; Outs</strong><br>Provide anti-hallucination exits like "If you are unsure or the data is missing, output 'N/A' — never make up details".</li>
+            </ol>
+          </div>
+          <div class="guide-tab-content" id="guideTab_models" style="display: none;">
+            <h1>Recommended Models &amp; Providers</h1>
+            <p>Prompt optimization is a translation and formatting task rather than a knowledge or deep logic task. The best models for this job are those that excel at strict instruction-following (IFEval benchmarks) and respond quickly.</p>
+
+            <h2>Recommended Tiers</h2>
+
+            <h3>1. Standard Tier (Best Value &amp; Sweet Spot)</h3>
+            <p>Standard models offer the best balance of instruction-following capability, speed, and cost. For 90% of tasks, these models will produce rewrites on par with premium offerings.</p>
+            <ul>
+              <li><strong>MiniMax-M3</strong> (NVIDIA NIM or OpenRouter) - <em>Top overall instruction-following benchmark performer.</em></li>
+              <li><strong>Nemotron 3 Ultra</strong> (NVIDIA NIM) - <em>Extremely fast and highly compliant.</em></li>
+              <li><strong>GPT-5.4 Mini</strong> (OpenAI) - <em>The recommended choice if you bring an OpenAI API key.</em></li>
+            </ul>
+
+            <h3>2. Premium Tier (Maximum Capability)</h3>
+            <p>Premium models are suitable when your input prompt is extremely messy, vague, or complex, requiring strong reasoning to infer your original intent.</p>
+            <ul>
+              <li><strong>Qwen3.7 Max</strong> (Alibaba direct or OpenRouter) - <em>Outstanding compliance and context understanding.</em></li>
+              <li><strong>Gemini 3.5 Flash (High)</strong> (Google AI Studio) - <em>Very responsive with excellent structural formatting.</em></li>
+              <li><strong>GPT-5.5 Medium</strong> (OpenAI) - <em>Strong performance; higher reasoning profiles are too slow for prompt editing.</em></li>
+            </ul>
+
+            <h3>3. Cheap Tier (High Volume &amp; Low Cost)</h3>
+            <p>If you are optimizing thousands of prompts or on a tight budget:</p>
+            <ul>
+              <li><strong>DeepSeek V4 Flash</strong> - <em>Near-premium formatting at a fraction of the cost.</em></li>
+              <li><strong>Gemini 3.1 Flash-Lite</strong> - <em>Ultra-fast responses with clean sectioning.</em></li>
+              <li><strong>GPT-5.4 Nano</strong> - <em>Efficient and lightweight OpenAI model.</em></li>
+            </ul>
+
+            <h2>API Providers Supported</h2>
+            <ul>
+              <li><strong>OpenRouter:</strong> A single hub providing access to Qwen, DeepSeek, Gemini, and Llama models. Supports a variety of free-tier models.</li>
+              <li><strong>NVIDIA NIM:</strong> Offers excellent speed and free-tier API endpoints for many open weights models like Nemotron and DeepSeek.</li>
+              <li><strong>Google AI Studio:</strong> Fast, smart, and often has generous free rate limits for Gemini 3.5/3.1 models.</li>
+              <li><strong>OpenAI / Anthropic:</strong> Directly configure your sk- keys for official GPT or Claude models.</li>
+            </ul>
+          </div>
+          <div class="guide-tab-content" id="guideTab_manual" style="display: none;">
+            <h1>App Manual: Controls &amp; Features</h1>
+            <p>This guide explains how to use each control in the Prompt Optimizer interface to fine-tune your results.</p>
+
+            <h2>Configuration Controls</h2>
+            <ul>
+              <li><strong>Target Model:</strong> Select the specific LLM architecture you plan to use the optimized prompt on (Generic, Claude, GPT, Gemini, or Small Local).
+                <ul>
+                  <li><em>Claude:</em> Delimits data with XML tags (e.g. <code>&lt;task&gt;</code>) and structures prompts for Anthropic's long-context window.</li>
+                  <li><em>GPT:</em> Favors clean markdown headers and bulleted lists.</li>
+                  <li><em>Gemini:</em> Uses structured markdown sections designed for Google's reasoning engines.</li>
+                  <li><em>Small Local:</em> Rewrites prompts to be simpler and more direct, avoiding complex nesting that small models fail to follow.</li>
+                </ul>
+              </li>
+              <li><strong>Length:</strong> Choose from <strong>Concise</strong> (keep it short and tight), <strong>Standard</strong> (moderate expansion), or <strong>Full</strong> (exhaustive context, rules, and safety nets).</li>
+              <li><strong>Strength:</strong> Adjusts the structural rewrite behavior.
+                <ul>
+                  <li><em>Concise:</em> Focuses solely on eliminating fluff and organizing core instructions.</li>
+                  <li><em>Balanced:</em> Standard balance of structural formatting and instruction expansion.</li>
+                  <li><em>Detailed:</em> Heavily annotates constraints, edge cases, and safety instructions.</li>
+                </ul>
+              </li>
+              <li><strong>Techniques:</strong>
+                <ul>
+                  <li><em>Chain of Thought (CoT):</em> Instructs the model to output step-by-step reasoning. Auto-disabled for reasoning-native models (which use thinking API budgets).</li>
+                  <li><em>Few-shot:</em> Includes empty placeholders for positive and negative examples to guide the model.</li>
+                  <li><em>XML Tags:</em> Explicitly structures sections with XML tags.</li>
+                  <li><em>Placeholders:</em> Converts variables in the raw prompt to <code>{{variable}}</code> syntax.</li>
+                </ul>
+              </li>
+            </ul>
+
+            <h2>Workflow Actions</h2>
+            <ul>
+              <li><strong>Optimize:</strong> Sends your prompt to the selected Engine to restructure, rewrite, and format.</li>
+              <li><strong>Critique:</strong> Performs an audit of your raw prompt across four criteria (Outcome Clarity, Structure, Output Contract, Robustness) and scores each 1-10, with the top 3 recommended fixes.</li>
+              <li><strong>Refine:</strong> Modify your optimized prompt iteratively by giving natural language instructions (e.g. "Add a constraints section for security" or "Make the tone friendlier").</li>
+              <li><strong>Test Bench:</strong> Opens a split-screen view. You can enter test variables, run both the original and optimized prompts side-by-side, and view a verdict comparing their outputs.</li>
+            </ul>
+
+            <h2>Management &amp; Sharing</h2>
+            <ul>
+              <li><strong>Library &amp; History:</strong> Saved prompts are persisted in your browser's localStorage. You can rename prompts, add tags, track version history (v1, v2, v3), or access recent runs.</li>
+              <li><strong>Export:</strong> Save your prompt to your local machine as Markdown (.md) with frontmatter, Plain Text (.txt), or structured JSON (containing the variable schema).</li>
+              <li><strong>Variables Sandbox:</strong> If your prompt contains placeholders like <code>{{name}}</code> or <code>[UPPERCASE]</code>, the UI displays form fields where you can enter test values and preview the compiled prompt in real-time.</li>
+            </ul>
+
+            <h2>Keyboard Shortcuts &amp; Drag-and-Drop</h2>
+            <ul>
+              <li><strong>Keyboard Shortcuts:</strong>
+                <ul>
+                  <li>Press <code>Ctrl+Enter</code> (or <code>Cmd+Enter</code> on macOS) to quickly trigger the primary action (Optimize when focused on the main input, or Run comparison when inside the Test Bench).</li>
+                  <li>Press <code>Escape</code> to close any open panels, settings, guide, or modals.</li>
+                </ul>
+              </li>
+              <li><strong>File Drag-and-Drop:</strong> Drag and drop a plain text file (with a <code>.txt</code> or <code>.md</code> extension) directly onto the raw prompt textarea to instantly load its contents.</li>
+            </ul>
+          </div>
+          <div class="guide-tab-content" id="guideTab_faq" style="display: none;">
+            <h1>FAQ &amp; Security Threat Model</h1>
+
+            <h2>Frequently Asked Questions</h2>
+
+            <h3>How is my API key stored and handled?</h3>
+            <p>Your API keys are stored only in your browser's local storage (<code>localStorage</code>). They are sent directly from your browser to the LLM provider (or via the lightweight Cloudflare Pages API functions when calling endpoints). We <strong>never</strong> store, log, or share your API keys.</p>
+
+            <h3>Can I use the app without bringing my own key?</h3>
+            <p>Yes. If the site administrator has configured shared hosted keys, you can select the "Use shared hosted key" option in API Settings. Note that shared keys are rate-limited and subject to daily caps. For production usage or complex prompts, bringing your own key is highly recommended.</p>
+
+            <h3>How do variables / placeholders work?</h3>
+            <p>If your raw prompt contains variables like <code>{{data}}</code> or bracketed placeholders like <code>[INSERT QUERY]</code>, the optimizer will detect them and render them as interactive tags. The UI allows you to input values into a form to compile the final prompt instantly.</p>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);">
+
+            <h2>Security Threat Model &amp; BYO Key Security</h2>
+            <p><strong>1. Client-Side Encryption &amp; Storage</strong><br>Your API keys are stored in <code>localStorage</code> in plaintext. Because they remain sandboxed within the origin domain of this application, they are inaccessible to other websites.</p>
+
+            <p><strong>2. Direct Transit</strong><br>When an optimization request is sent:
+            <ul>
+              <li>If a custom Base URL is set, the request may bypass our Cloudflare Pages Function and make a direct request to your endpoint (depending on your CORS settings).</li>
+              <li>If standard routing is used, our Cloudflare Pages Function receives the key in the request headers and acts as a pure, stateless proxy forwarding the request directly to the provider (OpenAI, Anthropic, OpenRouter, or NVIDIA).</li>
+              <li>The Pages Function does <strong>not</strong> write keys to persistent storage, database, or console logs.</li>
+            </ul>
+            </p>
+
+            <p><strong>3. Shared Hosted Keys Option</strong><br>When utilizing the shared hosted keys provided by the application administrator:
+            <ul>
+              <li>The keys are kept strictly as encrypted secrets within Cloudflare Pages environment variables.</li>
+              <li>These keys are never exposed to the client browser. The client browser only specifies the provider name, and the server function injects the secret server-side before calling the LLM provider.</li>
+            </ul>
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid var(--border); padding: 12px 18px;">
+        <button class="modal-btn modal-btn-secondary" id="guideCloseFooter" style="width: 100px;">Close</button>
       </div>
     </div>
   </div>
@@ -2029,11 +2355,25 @@
         rawPrompt.focus();
       });
 
-      // ---------- Keyboard: Ctrl/Cmd+Enter to optimize ----------
+      // ---------- Keyboard shortcuts & input helpers ----------
       document.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          e.preventDefault();
-          if (!optimizeBtn.disabled) optimizeBtn.click();
+          if (document.activeElement === rawPrompt) {
+            e.preventDefault();
+            if (!optimizeBtn.disabled) optimizeBtn.click();
+          } else if (document.activeElement === benchInput && benchOpen) {
+            e.preventDefault();
+            if (!benchRun.disabled) benchRun.click();
+          } else if (document.activeElement === refineInput) {
+            e.preventDefault();
+            applyRefinement();
+          } else if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
+            // Do not intercept Ctrl+Enter inside other text fields
+          } else {
+            // Global fallback if no specific input is focused
+            e.preventDefault();
+            if (!optimizeBtn.disabled) optimizeBtn.click();
+          }
         }
         if (e.key === 'Escape') {
           if (benchOpen) {
@@ -2047,6 +2387,7 @@
           closeSettings();
           closeExportModal();
           closeFeedbackModal();
+          closeGuide();
           closeDevMenu();
           closeAllTooltips();
         }
@@ -2146,7 +2487,7 @@
 
       function providerFields() {
         var settings = loadSettings();
-        if (!settings.provider) { // Use shared hosted key (or fallback mode)
+        if (!settings.provider || settings.provider === 'hosted') { // Use shared hosted key (or fallback mode)
           if (settings.hostedModelPreset) {
             var parts = settings.hostedModelPreset.split('/');
             var p = parts[0];
@@ -2163,7 +2504,7 @@
 
       function refreshEngineChip() {
         var settings = loadSettings();
-        if (settings.apiKey && settings.provider) {
+        if (settings.apiKey && settings.provider && settings.provider !== 'hosted') {
           engineChip.textContent = '● ' + settings.provider + ' (' + (settings.model || 'default') + ')';
           engineChip.classList.remove('offline');
           return;
@@ -2226,8 +2567,14 @@
         var provider = settingsProvider.value;
         var needsBaseUrl = provider === 'custom' || provider === 'cloudflare';
         
-        if (!provider) { // Hosted fallback mode
+        if (provider === 'hosted') { // Hosted fallback mode
           settingsHostedModelGroup.style.display = 'flex';
+          settingsApiKeyGroup.style.display = 'none';
+          settingsModelGroup.style.display = 'none';
+          settingsBaseUrlGroup.style.display = 'none';
+          settingsFreeKeyHint.style.display = 'none';
+        } else if (!provider) { // Select provider placeholder
+          settingsHostedModelGroup.style.display = 'none';
           settingsApiKeyGroup.style.display = 'none';
           settingsModelGroup.style.display = 'none';
           settingsBaseUrlGroup.style.display = 'none';
@@ -2302,13 +2649,15 @@
 
       document.getElementById('settingsSave').addEventListener('click', function () {
         var provider = settingsProvider.value;
-        var needsBaseUrl = provider === 'custom' || provider === 'cloudflare';
+        var savedProvider = provider;
+        var needsBaseUrl = savedProvider === 'custom' || savedProvider === 'cloudflare';
+        var isHostedMode = savedProvider === 'hosted' || savedProvider === '';
         saveSettingsObj({
-          provider: provider,
-          apiKey: provider ? settingsApiKey.value.trim() : '',
-          model: provider ? settingsModel.value.trim() : '',
+          provider: savedProvider,
+          apiKey: isHostedMode ? '' : settingsApiKey.value.trim(),
+          model: isHostedMode ? '' : settingsModel.value.trim(),
           baseUrl: needsBaseUrl ? settingsBaseUrl.value.trim() : '',
-          hostedModelPreset: provider ? '' : settingsHostedModel.value
+          hostedModelPreset: isHostedMode ? settingsHostedModel.value : ''
         });
         refreshEngineChip();
         closeSettings();
@@ -2424,7 +2773,7 @@
         var model = data.model || settings.model || 'default';
         var isFree = false;
 
-        var isHosted = !settings.apiKey || !settings.provider;
+        var isHosted = !settings.apiKey || !settings.provider || settings.provider === 'hosted';
         
         if (isHosted || model.toLowerCase().indexOf('free') !== -1 || model.toLowerCase().indexOf(':free') !== -1) {
           isFree = true;
@@ -4076,6 +4425,142 @@
             feedbackSend.textContent = 'Send feedback';
           });
       });
+
+      // ---------- Guide Modal & Tab switching ----------
+      var guideModal = document.getElementById('guideModal');
+      var guideBtn = document.getElementById('guideBtn');
+      var guideClose = document.getElementById('guideClose');
+      var guideCloseFooter = document.getElementById('guideCloseFooter');
+      var guideTabs = document.querySelectorAll('.guide-tab-btn');
+      var guideContents = document.querySelectorAll('.guide-tab-content');
+
+      function openGuide() {
+        guideModal.classList.add('open');
+        guideModal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeGuide() {
+        guideModal.classList.remove('open');
+        guideModal.setAttribute('aria-hidden', 'true');
+      }
+
+      if (guideBtn) guideBtn.addEventListener('click', openGuide);
+      if (guideClose) guideClose.addEventListener('click', closeGuide);
+      if (guideCloseFooter) guideCloseFooter.addEventListener('click', closeGuide);
+      if (guideModal) {
+        guideModal.addEventListener('click', function (e) {
+          if (e.target === guideModal) closeGuide();
+        });
+      }
+
+      guideTabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          var targetTab = tab.getAttribute('data-guide-tab');
+          
+          guideTabs.forEach(function (t) { t.classList.remove('active'); });
+          tab.classList.add('active');
+
+          guideContents.forEach(function (content) {
+            if (content.id === 'guideTab_' + targetTab) {
+              content.style.display = 'block';
+            } else {
+              content.style.display = 'none';
+            }
+          });
+        });
+      });
+
+      // settings to guide security tab transition
+      var settingsGoToSecurity = document.getElementById('settingsGoToSecurity');
+      if (settingsGoToSecurity) {
+        settingsGoToSecurity.addEventListener('click', function (e) {
+          e.preventDefault();
+          closeSettings();
+          openGuide();
+          var faqTabBtn = document.querySelector('[data-guide-tab="faq"]');
+          if (faqTabBtn) faqTabBtn.click();
+        });
+      }
+
+      // Footer links to guide tabs
+      var footerHowItWorks = document.getElementById('footerHowItWorks');
+      var footerMethodology = document.getElementById('footerMethodology');
+      var footerFeatures = document.getElementById('footerFeatures');
+      var footerWhyThisExists = document.getElementById('footerWhyThisExists');
+
+      function openGuideTab(tabId) {
+        openGuide();
+        var tabBtn = document.querySelector('[data-guide-tab="' + tabId + '"]');
+        if (tabBtn) tabBtn.click();
+      }
+
+      if (footerHowItWorks) {
+        footerHowItWorks.addEventListener('click', function(e) {
+          e.preventDefault();
+          openGuideTab('why');
+        });
+      }
+      if (footerMethodology) {
+        footerMethodology.addEventListener('click', function(e) {
+          e.preventDefault();
+          openGuideTab('methodology');
+        });
+      }
+      if (footerFeatures) {
+        footerFeatures.addEventListener('click', function(e) {
+          e.preventDefault();
+          openGuideTab('manual');
+        });
+      }
+      if (footerWhyThisExists) {
+        footerWhyThisExists.addEventListener('click', function(e) {
+          e.preventDefault();
+          openGuideTab('why');
+        });
+      }
+
+      // ---------- Drag & Drop File into Input ----------
+      // Prevent browser default behavior of opening files dropped on the page
+      window.addEventListener('dragover', function (e) {
+        e.preventDefault();
+      }, false);
+      window.addEventListener('drop', function (e) {
+        e.preventDefault();
+      }, false);
+
+      if (rawPrompt) {
+        rawPrompt.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          rawPrompt.classList.add('dragover');
+        });
+
+        rawPrompt.addEventListener('dragleave', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          rawPrompt.classList.remove('dragover');
+        });
+
+        rawPrompt.addEventListener('drop', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          rawPrompt.classList.remove('dragover');
+
+          var files = e.dataTransfer.files;
+          if (files.length > 0) {
+            var file = files[0];
+            if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+              var reader = new FileReader();
+              reader.onload = function (evt) {
+                rawPrompt.value = evt.target.result;
+                updateInputState();
+                rawPrompt.dispatchEvent(new Event('input'));
+              };
+              reader.readAsText(file);
+            }
+          }
+        });
+      }
 
       renderOutputBody();
     })();

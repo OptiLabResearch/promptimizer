@@ -581,7 +581,7 @@ and documented enough that asking strangers for feedback is worthwhile.**
 - **Owner request:** "decide what to track, how to track it, then implement." §4b already
   specifies the *what* and *how*; this item is the *implement*. Give to Haiku 4.5.
 
-### 4.5 Documentation set — `L` — owner: full "Documentation" block
+### 4.5 ✅ Documentation set — `L` — owner: full "Documentation" block (video skipped per user instruction)
 - **SMART:** By 2026-07-25, publish an in-app **Docs / Guide** panel (and matching
   `docs/` markdown) with five sections, each ≤ 1 screen, reachable from a persistent "Guide"
   link in the header:
@@ -674,7 +674,7 @@ and "I'd use this daily." Re-order against 4.6 findings before starting.
   mobile confirmed; toasts readable and auto-dismissing; tap targets ≥ 44px (already partly
   done in Phase 1).
 
-### 5.7 API-key help & trust copy — `S` — owner: "how to get/paste key, where free ones are, why BYO is secure"
+### 5.7 ✅ API-key help & trust copy — `S` — owner: "how to get/paste key, where free ones are, why BYO is secure"
 - **SMART:** By 2026-08-07, the Settings/API panel gains a "Where do I get a key?" link block:
   step-by-step for 2–3 free providers, a one-paragraph "your key is stored only in this
   browser and sent directly to the provider — never to our server or logs" note (sourced from
@@ -682,7 +682,7 @@ and "I'd use this daily." Re-order against 4.6 findings before starting.
 - **Done when:** copy present; links resolve; claims match the actual code path verified in
   4.2 (no server-side persistence/logging of BYO keys).
 
-### 5.8 Keyboard & input niceties — `S` — (reviewer consensus, cheap)
+### 5.8 ✅ Keyboard & input niceties — `S` — (reviewer consensus, cheap)
 - **SMART:** By 2026-08-12, `Cmd/Ctrl+Enter` triggers Optimize from the textarea, and dropping
   a `.txt`/`.md` file into the input loads its contents.
 - **Done when:** both work on desktop; documented in the manual; don't interfere with mobile.
