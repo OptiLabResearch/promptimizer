@@ -499,24 +499,29 @@ export async function resolveProviderConfig(body, env) {
     }
   }
 
-  // Pre-load catalogs for any hosted provider dynamically to filter out rotated models
-  const catalogs = {};
-  for (const provider of sharedProviders) {
+  // Pre-load catalogs in parallel to avoid sequential delay bottlenecks (skip 'google' since model names are static and API parameters differ)
+  const catalogPromises = sharedProviders.map(async (provider) => {
     const preset = PROVIDER_PRESETS[provider];
-    if (!preset || !preset.baseUrl) continue;
+    if (!preset || !preset.baseUrl || provider === "google") return null;
     
     const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
     const key = env[`${cleanProviderName}_API_KEY`] || 
                 env[`${cleanProviderName}_KEY`] ||
                 (provider === "nvidia" ? env.NVIDIA_API_KEY :
-                 provider === "openrouter" ? env.OPENROUTER_API_KEY :
-                 provider === "google" ? env.GOOGLE_API_KEY : undefined);
+                 provider === "openrouter" ? env.OPENROUTER_API_KEY : undefined);
                  
     if (key) {
       const activeList = await fetchActiveModelsForProvider(provider, preset.baseUrl, key);
-      if (activeList) {
-        catalogs[provider] = activeList;
-      }
+      return { provider, activeList };
+    }
+    return null;
+  });
+
+  const resolvedCatalogs = await Promise.all(catalogPromises);
+  const catalogs = {};
+  for (const item of resolvedCatalogs) {
+    if (item && item.activeList) {
+      catalogs[item.provider] = item.activeList;
     }
   }
 
