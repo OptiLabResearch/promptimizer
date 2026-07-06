@@ -203,7 +203,11 @@ One primary action per state (Fable's rule): Optimize → Test Both / Copy.
 
 ### Deliberately NOT doing (rejected from the reviews)
 - **Accounts, workspaces, billing/pricing pages, team libraries** (GLM's IA) — fake chrome
-  for a free static tool; Fable's "don't build a fake pricing page" is right.
+  for a free static tool; Fable's "don't build a fake pricing page" is right. **(Update
+  2026-07-06: the owner has since requested login + cross-device sync. This is now a deliberate
+  Phase-8 decision — see §6 Phase 8 item 8.0 — not something we're avoiding. It stays out of
+  Phases 4–7 by choice: it's foundational, high-risk, and must not block launch or the
+  no-login flow.)**
 - **Multi-model A/B matrix** (optimize for 3 models simultaneously) — high cost, low demand
   until single-target flow is proven.
 - **CodeMirror/Monaco + react-diff-viewer** — the app is framework-free static HTML; a mono
@@ -712,6 +716,62 @@ Build cheap/free client-side signals first, then the AI-backed ones.
 
 ---
 
+## Phase 6.5 — Reviewer enhancements & polish (no backend; batch opportunistically)
+
+Everything the reviews asked for that fits the current static/no-DB app. Individually small,
+mostly client-side or one-call features. Slot these between the bigger phases or bundle a few
+into a "polish sprint." Grouped by kind.
+
+**Optimizer power features:**
+- **Smart "Options" toggles** (`M`): add checkboxes to the options accordion that inject
+  targeted directives into the system prompt — "Add few-shot example placeholders", "Force
+  output format (JSON/Markdown)", "Add guardrails (if unsure, say so)". Each maps to one line
+  appended in `optimizer.js` (same pattern as the existing technique toggles).
+- **System / User / Assistant separation** (`M`): let users tag prompt regions as
+  `[System]` / `[User]` / `[Few-shot]`; the optimizer respects those boundaries and rewrites
+  only the relevant parts. Backend change: pass the segmented structure through and constrain
+  the rewrite per segment. Pairs with 8.9's context manager.
+- **Built-in framework library** (`S`): a curated (by you, not community) list of proven
+  frameworks — RTF (Role-Task-Format), CARE, Chain-of-Thought, etc. — as starter templates the
+  user clicks to seed the raw input. Pure client-side content; distinct from 8.5's community
+  gallery. Extends the existing preset chips.
+- **Interactive prompt builder** (`M`): instead of optimizing immediately, optionally ask 3–5
+  smart follow-up questions (audience? length? tone? format? citations?) and fold the answers
+  into a much stronger prompt. One extra call to generate the questions, or a rules-based
+  question set per detected intent (7.6). Often beats one-shot optimization.
+
+**Result presentation:**
+- **"Why this works" annotation tooltips** (`S`): in the structured view, make added phrases
+  (role assignment, "think step-by-step", output contract) hover/tap-to-explain — a tooltip on
+  *why* the optimizer added it and its effect. Enhances the per-section notes already shipped in
+  Phase 2.
+- **Diff-view reject** (`M`): in the word-diff, color additions green / removals red and let the
+  user click a green addition to reject it, re-compiling the prompt without that change. Builds
+  on the existing per-section diff.
+- **Collapsed options summary chip** (`S`): when the options accordion is collapsed, show a
+  compact summary of active settings ("Professional • GPT • Structured • Full") so state is
+  always visible. Tiny, high-clarity.
+- **Post-result metrics strip** (`S`): a one-line strip under the result — "Quality 94/100 ·
+  tokens −18% · readability +27% · GPT ✓ Claude ✓ Gemini ✓". Mostly a presentation layer over
+  5.5 (tokens/cost) + 6.2 (score); makes the improvement tangible at a glance.
+- **First-run empty-state examples** (`S`): the empty result pane showcases a few sample prompts
+  / one-click templates so new users aren't staring at a blank box. Uses the existing preset
+  catalog content.
+
+**Export & interop:**
+- **More export formats** (`S`): add YAML, a LangChain `PromptTemplate` snippet, and a raw
+  `curl` command to the existing `.md`/`.txt`/JSON export modal.
+- **Export as code** (`M`): a button that emits ready-to-paste snippets — Python OpenAI SDK,
+  Anthropic SDK, cURL, or a JSON request body — with the compiled prompt and variables wired in.
+  The "port into my codebase" job; overlaps with 8.2's CLI but is client-side and needs no
+  accounts.
+
+**Multi-model readout** (`S`, pairs with 7.4): a compatibility star rating per model
+(OpenAI ★★★★★ / Claude ★★★★☆ / Gemini ★★★★★) shown on a result, as a lightweight teaser for the
+full per-model variants in 7.4.
+
+---
+
 ## Phase 7 — Novel bets (the moat)  (target Q4 2026)
 
 The things no competitor ships. Each is independently valuable; sequence by the impact/effort
@@ -760,18 +820,46 @@ BYO-key, Cloudflare static app" filter.
   cost-per-pass; shows the recommendation with the evidence. The product-level synthesis of the
   reviewers' cost counter + eval suite.
 
-### 7.6 Backlog / opportunistic (spec later, build on demand)
-- **Comprehension check / back-translation** (`S`): one cheap call showing "here's what the
-  model thinks you're asking" before a real run.
-- **Ablation-based signal attribution** (`M`): strip each section, re-run, report which parts
-  carry no signal (empirical, not a vibe score). Depends on 6.3's runner.
-- **Ensemble disagreement detector** (`M`): run the optimize step through two optimizer models;
-  where they diverge = your intent was ambiguous.
-- **Anti-goal field** (`S`): a "what I do NOT want" input folded into `## Constraints`.
-- **Prompt staleness / drift pin** (`M`): store the model+date a saved prompt was validated
-  against; flag "unverified since the model changed."
-- **Prompt chaining** (`L`), **intent detection** (`M`), **optimization-mode presets**
-  (minimal-edit/clarity/token-efficient/etc.) (`M`), **few-shot example generator** (`M`).
+### 7.6 Novel-bets backlog (spec-lite; promote to a numbered item when you pick one up)
+Each is independently shippable and reuses existing infra. Sizes assume the eval runner (6.3)
+already exists where noted.
+- **Comprehension check / back-translation** (`S`): one cheap call asking the target model to
+  paraphrase what it thinks it's being asked, shown before a real run so misreadings surface
+  early. New `mode:"comprehend"`. Catches ambiguity optimization can't.
+- **Ablation-based signal attribution** (`M`, needs 6.3): strip each `##` section one at a
+  time, re-run against a test input, measure output change, and report which sections are dead
+  weight vs load-bearing — empirical, not a vibe score.
+- **Ensemble disagreement detector** (`M`): run the optimize step through two optimizer models
+  (reuses the fallback plumbing); diff the rewrites; highlight divergent spots as "the model
+  had to guess here" = your intent was ambiguous.
+- **Anti-goal / negative-space field** (`S`): a dedicated "what I do NOT want" input that folds
+  into `## Constraints`. Users think in negatives; nothing captures it today.
+- **Prompt staleness / drift pin** (`M`): store the model + date a saved prompt was validated
+  against; when the pinned model version moves, flag it "unverified since the model changed —
+  re-test?" Tackles prompt rot; pairs well with 8.0 sync.
+- **Output simulator** (`M`): predict the likely response + a confidence estimate + a "possible
+  failure" note (e.g. "may hallucinate sources") without a full run — one cheap call framed as
+  a dry-run. (Reviewer idea; label clearly as an estimate, not a guarantee.)
+- **Failure prediction / risk score** (`S`, extends 6.1/6.2): a single "risk %" with the top
+  reasons a prompt may fail (ambiguous success criteria, conflicting tasks, missing format).
+  Mostly a presentation layer over the linter + critique outputs.
+- **Prompt intent detection** (`M`): auto-classify the task (coding/marketing/extraction…) and
+  auto-suggest an optimization profile ("Code Tutor", "SEO landing page"). One classification
+  call; feeds 6.5's optimization modes and 8.8's auto-tagging.
+- **Optimization-mode presets** (`M`): one-click profiles (minimal-edit, clarity, professional,
+  token-efficient, structured-output, reasoning-optimized, creative, strict-instruction).
+  Each is a preset bundle of the existing strength/length/technique/target knobs plus a system-
+  prompt tweak — low code, high perceived value.
+- **Few-shot example generator** (`M`): auto-generate 2–3 contrastive input→output examples for
+  the prompt (including one annotated near-miss), reusing the few-shot guidance already in
+  `TECHNIQUE_GUIDELINES`. One call; user can edit/keep.
+- **Automatic prompt compression** (`M`): a "compress" action that shortens a long prompt while
+  preserving meaning, showing token savings (1200 → 500 → 300). Distinct from 5.2's optimize;
+  valuable for API users on token budgets. Verify meaning is preserved with the comprehension
+  check above.
+- **Prompt chaining** (`L`): let the output of one prompt feed as input to another; a small
+  visual chain of prompt nodes. Bigger lift (state model for multi-step), and arguably a
+  different product — spec carefully before committing.
 
 ---
 
@@ -779,20 +867,224 @@ BYO-key, Cloudflare static app" filter.
 
 Large efforts that change the project's shape. Do **not** start until Phases 4–6 have proven
 retention; several conflict with the "no accounts, no backend" identity and need an explicit
-decision to cross that line.
+decision to cross that line. **8.0 is that decision** — the owner has asked for login +
+cross-device sync, which is the foundation the rest of this phase (and team features) sits on.
 
-- **Browser extension** (`XL`) — optimize inline on ChatGPT/Claude/Gemini/Cursor. Biggest
-  distribution lever; a separate codebase and store-review pipeline. Highest-value Phase-8 bet.
-- **CLI + public API** (`XL`) — `promptoptimize "…"`; programmatic access for CI. The Pages
-  Functions are already an API — this is packaging + auth + rate-limiting + docs.
-- **Multimodal input** (`XL`) — optimize from a screenshot/PDF/sketch. Needs a
-  vision-capable model path; real cost.
-- **Voice input** (`M`) — Web Speech API mic button for dictating the rough idea. Smaller;
-  could slot earlier as a Phase-5 nice-to-have if demand shows.
-- **Team features** (`XL`) — shared libraries, comments, review workflow. **Explicitly
-  rejected in §3's "Deliberately NOT doing"** for a free static tool; only revisit if you
-  decide to add accounts + a backend and monetize team/enterprise. Keep 90% free (owner's
-  and reviewers' shared stance).
+### 8.0 Accounts & cross-device sync (foundational) — `XL` — owner: "login so users save/access sessions across devices & browsers"
+- **What it reverses:** today Library/History/eval-sets live in `localStorage` — per-browser,
+  per-device, lost on cache-clear. Cross-device access *requires* server-side identity +
+  storage. This crosses the "no accounts, no backend, no database" line §3 drew on purpose, so
+  treat it as a product decision, not just a feature. It's additive: **the no-login flow must
+  keep working** — anonymous users stay fully functional; login only *adds* sync.
+- **SMART:** By end of Q4 2026, a user can create an account, sign in on a second device/
+  browser, and see the same saved prompts, versions, tags, and eval sets — with a documented
+  migration that imports their existing `localStorage` library into the account on first
+  sign-in, losing nothing.
+- **Recommended stack (stay Cloudflare-native, no new vendor):** Cloudflare **D1** (SQLite) or
+  **KV** for storage behind Pages Functions; auth via **email magic-link** (simplest, no
+  passwords) or **OAuth (Google/GitHub)** — a Pages Function issues a signed, `HttpOnly`
+  session cookie. Avoid rolling your own password store. Fallback if you want it turnkey:
+  Clerk/Supabase Auth, at the cost of a third-party dependency.
+- **Done when:** sign-up + sign-in + sign-out work; sessions sync a saved prompt across two
+  browsers within a few seconds; `localStorage` → account migration runs once on first login
+  and is idempotent; anonymous mode is untouched; a security pass (extends 4.2) covers session
+  cookies, CSRF on the sync endpoints, per-user data isolation, and BYO-key handling (keys stay
+  client-side — **do not** sync API keys to the server); privacy note + account-deletion path
+  documented.
+- **Sequencing & dependencies:** do **not** start before Phase 4's security audit (4.2) —
+  auth is the highest-risk surface in the app. Once shipped it (a) unlocks the **team
+  features** below, (b) lets eval sets (6.3) and cost-to-pass results (7.5) sync too, and (c)
+  makes the no-DB permalink (7.1) a *complement*, not a competitor — keep 7.1 for zero-friction
+  sharing without an account.
+- **Lighter alternative if you're not ready for full accounts (`M`, decide first):** a
+  passphrase-based **"sync code"** — export the whole library to an encrypted blob stored in
+  KV under a user-chosen code, re-importable on any device. No login screen, no PII, no session
+  management; cross-device without accounts. Weaker UX (manual, no live sync) but keeps the
+  no-backend-identity mostly intact and ships in days, not weeks. **Recommend building this
+  first as a stepping stone** and only committing to full 8.0 accounts if usage justifies it.
+
+#### 8.0 — Implementation spec (concrete)
+
+**Storage: Cloudflare D1 (SQLite).** One binding in `wrangler.toml` (`[[d1_databases]]`,
+`binding = "DB"`). D1 is serverless SQLite, free at this scale, same platform, no new vendor.
+Use KV only for the ephemeral magic-link tokens if you'd rather not put them in D1 (either is
+fine).
+
+**Schema (`schema.sql`, applied with `wrangler d1 execute`):**
+```sql
+CREATE TABLE users (
+  id          TEXT PRIMARY KEY,          -- uuid
+  email       TEXT UNIQUE NOT NULL,
+  created_at  INTEGER NOT NULL,          -- epoch ms
+  last_login  INTEGER
+);
+
+CREATE TABLE magic_links (
+  token       TEXT PRIMARY KEY,          -- random 32-byte hex
+  email       TEXT NOT NULL,
+  expires_at  INTEGER NOT NULL,          -- created + 15 min
+  used_at     INTEGER                    -- NULL until consumed (single-use)
+);
+
+CREATE TABLE prompts (
+  id          TEXT PRIMARY KEY,          -- uuid, generated client-side so migration is idempotent
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  tags        TEXT DEFAULT '[]',         -- JSON array
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX idx_prompts_user ON prompts(user_id, updated_at DESC);
+
+CREATE TABLE prompt_versions (
+  id             TEXT PRIMARY KEY,       -- uuid
+  prompt_id      TEXT NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
+  version_no     INTEGER NOT NULL,       -- 1,2,3… per prompt
+  raw_prompt     TEXT,
+  optimized_prompt TEXT,
+  explanation    TEXT,
+  options_json   TEXT,                   -- {target_model,length,strength,techniques,depth}
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX idx_versions_prompt ON prompt_versions(prompt_id, version_no);
+
+CREATE TABLE eval_sets (              -- Phase 6.3 test cases, synced too
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  prompt_id   TEXT REFERENCES prompts(id) ON DELETE CASCADE,
+  cases_json  TEXT NOT NULL,            -- [{input, expected|criteria}, …]
+  updated_at  INTEGER NOT NULL
+);
+```
+Note: **no `api_keys` table — BYO keys never leave the browser.** History/"recent runs" can
+stay `localStorage`-only (ephemeral) or get its own table if you want it synced; start without.
+
+**Auth: email magic-link (passwordless).** New functions under `functions/api/auth/`:
+- `request.js` (`POST {email}`): validate email, generate a 32-byte random `token`, insert into
+  `magic_links` with `expires_at = now + 15min`, email a link `…/api/auth/callback?token=…`.
+  Rate-limit to ~5/hour/email (a KV counter) so it can't be used to spam inboxes.
+- `callback.js` (`GET ?token`): look up token → reject if missing, `used_at` set, or expired;
+  mark `used_at`; `INSERT … ON CONFLICT(email) DO UPDATE last_login` to upsert the user; mint a
+  signed session **JWT** (HS256, secret in `env.SESSION_SECRET`, ~30-day expiry) and set it as
+  `Set-Cookie: session=…; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=…`; 302 back to `/`.
+- `me.js` (`GET`): read+verify the cookie, return `{email}` or 401 — the client uses this on
+  load to decide signed-in vs anonymous.
+- `logout.js` (`POST`): clear the cookie.
+- A shared `functions/_lib/auth.js` helper: `requireUser(request, env)` verifies the JWT and
+  returns `user_id`, used at the top of every sync endpoint. Email delivery via **Resend** (or
+  any HTTP email API) with the key in env — MailChannels' free Workers route was discontinued,
+  so budget for an email provider.
+
+**Sync endpoints (`functions/api/sync/`), all call `requireUser` first, all scope every query
+by `user_id`:**
+- `pull.js` (`GET`): return the user's full library (prompts + versions + eval_sets) as JSON.
+- `push.js` (`POST {prompts:[…]}`): upsert by client-generated `id`; **last-write-wins** using
+  `updated_at` (server ignores an incoming row whose `updated_at` is older than stored). Good
+  enough for a single-user-across-devices case; real conflict is rare.
+- `import.js` (`POST {library}`): the migration endpoint (below).
+- `delete-account.js` (`POST`): `DELETE FROM users WHERE id=?` (cascades) — the GDPR/"delete my
+  data" path; document it.
+
+**Client changes (`public/`):** a thin `sync.js` — on load, call `/api/auth/me`; if signed in,
+`pull` and merge into the in-memory library, then `push` on every library mutation (debounced).
+If anonymous, behave exactly as today (localStorage only). Add a small "Sign in" control in the
+header and an account menu.
+
+**localStorage → account migration (idempotent):** on the *first* authenticated load where
+`localStorage.migratedToAccount` is unset: read the existing localStorage library, `POST` it to
+`/api/sync/import`. Because prompt/version `id`s are client-generated UUIDs, `import` upserts by
+`id` (`INSERT … ON CONFLICT(id) DO NOTHING`) so re-running it is a no-op — set
+`migratedToAccount=true` on success. Nothing is deleted from localStorage (keep it as an offline
+cache / anonymous fallback).
+
+**Security pass (extends 4.2), each a checklist item:** JWT secret only in env; cookies
+`HttpOnly+Secure+SameSite=Lax`; CSRF on mutating `/api/sync/*` and `/api/auth/logout` via
+SameSite=Lax + a double-submit token (or an `Origin`/`Referer` check) since they're
+cookie-authenticated; **every D1 query filtered by `user_id`** (per-user isolation — the #1
+bug class here); magic-link tokens single-use + short-lived + rate-limited; parameterised
+queries only (D1 `.bind()`, never string-concat SQL); confirm no BYO API key is ever written to
+D1 or logs.
+
+**Effort reality:** ~1 week for a careful first version (auth is fiddly and security-sensitive),
+which is why the **"sync code" lighter alternative above is the recommended stepping stone** —
+it needs only KV + one encrypt/decrypt + two endpoints, no cookies, no email provider, no
+per-user isolation surface, and delivers cross-device in a day or two.
+
+### 8.1 Browser extension — `XL` — (reviewer: "the move that turns a tool into a platform")
+- **SMART:** Ship a Manifest V3 extension for Chrome/Edge (then Firefox) that adds an
+  "Optimize" affordance to the prompt box on ChatGPT, Claude.ai, Gemini, and Cursor's chat,
+  calling the existing `/api/optimize-prompt/stream` endpoint and replacing the box contents in
+  place.
+- **Build notes:** separate repo/codebase; a content script per host injecting a button + a
+  small popup; reuses the Pages Functions as its backend (BYO key stored in
+  `chrome.storage.local`, or the 8.0 account session). Store-review pipeline (Chrome Web Store)
+  is its own multi-day process. **Biggest distribution lever in the whole plan**, but a real
+  second product to maintain — don't start until the web app's retention is proven.
+
+### 8.2 CLI + public API — `XL` — (reviewer: "power users will pay for this")
+- **SMART:** Publish an npm package `promptoptimize` (`npx promptoptimize "summarize this"`)
+  and a documented, versioned, rate-limited public HTTP API.
+- **Build notes:** the Pages Functions *are already* an HTTP API — this is packaging, not new
+  core logic: add API-key issuance (needs 8.0's accounts/DB), per-key rate-limiting (KV
+  counters or Cloudflare rate-limiting rules), OpenAPI docs, and a thin Node CLI that reads a
+  config/env key and streams the result. Natural first paid tier. Depends on 8.0.
+
+### 8.3 Multimodal & document input — `XL` — (reviewers: "multi-modal input", "context attachment")
+- **SMART:** Let users attach an image (screenshot/sketch) or a document (`.txt`/`.pdf`/`.csv`)
+  and either "optimize this prompt for this image" or "generate a prompt to extract X from this
+  document."
+- **Build notes:** two sub-capabilities that were separate reviewer asks: **(a) vision** —
+  route to a vision-capable model, add an image part to the request; real per-call cost, gate
+  behind BYO key. **(b) document context** — parse `.txt`/`.csv` client-side, `.pdf` via a JS
+  PDF text extractor; feed extracted text as delimited context. (b) is much cheaper than (a) and
+  could ship first as a Phase-6-ish add if demand shows. Watch the 26s Cloudflare deadline for
+  large docs — may need chunking.
+
+### 8.4 Voice input — `M` — (reviewer: "mic button, dictate your rough idea")
+- **SMART:** A mic button that uses the Web Speech API to dictate the raw prompt into the
+  textarea, with a visible transcript and graceful fallback where unsupported.
+- **Note:** the smallest Phase-8 item and mostly client-side — could jump forward into Phase 5
+  as a nice-to-have if users ask. No backend needed.
+
+### 8.5 Community template gallery / marketplace — `XL` — (reviewers: "template gallery, upvote-able", "your acquisition loop")
+- **SMART:** A public, browsable gallery of user-submitted prompt templates with categories
+  (code review, blog post, SQL, image prompt…), upvotes, and "open in optimizer."
+- **Build notes:** this is a **content platform**, a real restructure — needs 8.0's accounts +
+  D1 tables (`templates`, `template_votes`), submission moderation (spam/abuse), and a curation
+  policy. Distinct from the *built-in* framework library (6.5, client-side, curated by you).
+  High acquisition potential, high maintenance and moderation burden — the biggest "changes what
+  this project is" decision after accounts. Depends on 8.0.
+
+### 8.6 Team features — `XL` — (reviewers: "shared Notion for prompts")
+- **SMART:** Shared team libraries, comments on prompts, an activity feed, and an optional
+  approval/review workflow, scoped to an organization.
+- **Note:** **explicitly deferred in §3's "Deliberately NOT doing."** Only revisit after 8.0
+  ships and if you decide to monetize team/enterprise. Adds org/membership tables, roles/
+  permissions, and real access-control surface. Keep the core 90% free (owner's + reviewers'
+  shared stance); this is where monetization lives, not in gating solo features.
+
+### 8.7 Personal prompt analytics — `M` — (reviewer: "prompt analytics across history")
+- **SMART:** A private dashboard over the signed-in user's own library/history: average prompt
+  length, most common task type, optimization count, average quality-score trend (from 6.2),
+  most-used models and templates.
+- **Note:** distinct from the anonymous *usage* analytics in 4.4 (that's for you, the owner;
+  this is *for the user, about their own prompts*). Needs 8.0's synced history to be meaningful
+  across devices; a localStorage-only version is possible earlier but per-device.
+
+### 8.8 Library intelligence — `M` — (reviewers: "auto-tag, detect duplicates")
+- **SMART:** Auto-tag saved prompts by detected task/domain (coding/marketing/SQL…), surface
+  near-duplicate prompts, and cluster the library.
+- **Note:** auto-tagging is one cheap classification call per save; dedup is client-side
+  similarity (normalize + compare, or embeddings if you add them). Can be **localStorage-only
+  and shipped without a backend** — the only Phase-8-adjacent item here that doesn't strictly
+  need 8.0. Could move up to Phase 6 if wanted.
+
+### 8.9 Context manager / modular prompt components — `L` — (reviewer: "context manager", "prompt components")
+- **SMART:** Let users define reusable context blocks (style guide, coding standards, product
+  docs, persona) and toggle which ones compile into a given prompt (checkbox list → assembled
+  prompt), so large prompts become modular instead of monolithic.
+- **Note:** overlaps with **system/user/assistant separation** (6.5) and variables. Full value
+  (reuse blocks across many prompts) wants 8.0 sync; a single-prompt version is Phase-6-sized.
 
 ---
 
@@ -818,3 +1110,90 @@ Quick index so nothing the owner asked for is lost:
 | Better mobile success popups | 5.6 |
 | Ask for feedback before launch | 4.6 |
 | Decide + implement analytics | 4.4 (+ §4b) |
+| Login + cross-device session sync | 8.0 (foundational; lighter "sync code" alternative noted) |
+
+---
+
+# 9. Complete feature inventory (every reviewer idea → its home)
+
+The "nothing dropped" index. Covers all three original reviews, the second review wave, my
+additions, and the owner punch-list, mapped to what's shipped vs where it lives in the plan.
+`✅ = shipped (Phases 1–3)`.
+
+### Already shipped — don't rebuild (reviewers didn't know)
+Target-model selector · CoT/few-shot/XML/placeholder technique toggles · strength + length
+controls · iterative Refine · AI Critic (`critique` mode) · word-diff view · Test Bench
+(real A/B run) + verdict strip · History (recent runs) · Library (named, versioned, tagged,
+searchable) · git-like version chain · placeholder highlight + fill-flow + copy-gating ·
+variable sandbox + compiled preview · inline contenteditable editing · sectioned output
+accordions + per-section "why this changed" · token estimate (chars/4) · export .md/.txt/JSON
+(w/ variable schema) · preset/sample catalog · BYO-key settings · streaming · deep second-pass
+refine · above-the-fold delta bar · theme toggle.
+
+### Planned — full map
+
+| Reviewer / owner idea | Home | Size | Needs backend? |
+|---|---|---|---|
+| Deep code-cleanness + bug sweep | 4.1 | M | no |
+| Security audit | 4.2 | M | no |
+| Speed to <5s | 4.3 | M | no |
+| Usage analytics (anonymous) | 4.4 / §4b | M | Pages Fn only |
+| Documentation set (+ video) | 4.5 | L | no |
+| Pre-launch feedback round | 4.6 | S | no |
+| Options + Optimize inside input box | 5.1 | M | no |
+| Rename "Pretty" → "Structured" | 5.2 | S | no |
+| Free-model dropdown | 5.3 | M | no |
+| Target-model + variables tooltips | 5.4 | S | no |
+| Progress bar + time + token/cost | 5.5 | M | no |
+| Tablet/phone responsiveness (output-first, no h-scroll, mobile toasts) | 5.6 | L | no |
+| API-key help + BYO-security copy | 5.7 | S | no |
+| Keyboard shortcuts + drag-drop file | 5.8 | S | no |
+| Client-side prompt linter | 6.1 | M | no |
+| Quality score / rubric / doctor / complexity meter | 6.2 | M | no (reuses critique) |
+| Eval / test-case suite w/ auto-scoring | 6.3 | XL | no (uses BYO key) |
+| Variables clarity + convert-to-variable | 6.4 | M | no |
+| Smart Options toggles (few-shot/format/guardrails) | 6.5 | M | no |
+| System / User / Assistant separation | 6.5 | M | no |
+| Built-in framework library (RTF/CARE/CoT) | 6.5 | S | no |
+| Interactive prompt builder (follow-up Qs) | 6.5 | M | no |
+| "Why this works" annotation tooltips | 6.5 | S | no |
+| Diff-view color + reject-addition | 6.5 | M | no |
+| Collapsed options summary chip | 6.5 | S | no |
+| Post-result metrics strip | 6.5 | S | no |
+| First-run empty-state examples | 6.5 | S | no |
+| More export formats (YAML/LangChain/curl) | 6.5 | S | no |
+| Export as code (Python/Anthropic SDK/cURL) | 6.5 | M | no |
+| Multi-model compatibility stars | 6.5 (+7.4) | S | no |
+| No-DB shareable permalinks | 7.1 | M | no |
+| Prompt-injection / robustness harness | 7.2 | L | no (uses BYO key) |
+| Reverse mode (output → prompt) | 7.3 | M | no |
+| Multi-model variants / prompt personas | 7.4 | L | no |
+| Cost-to-pass model recommender | 7.5 | L | no (needs 6.3) |
+| Comprehension check / back-translation | 7.6 | S | no |
+| Ablation signal attribution | 7.6 | M | no (needs 6.3) |
+| Ensemble disagreement detector | 7.6 | M | no |
+| Anti-goal / negative-space field | 7.6 | S | no |
+| Prompt staleness / drift pin | 7.6 | M | no |
+| Output simulator (predicted response) | 7.6 | M | no |
+| Failure prediction / risk score | 7.6 | S | no |
+| Intent detection | 7.6 | M | no |
+| Optimization-mode presets | 7.6 | M | no |
+| Few-shot example generator | 7.6 | M | no |
+| Automatic prompt compression | 7.6 | M | no |
+| Prompt chaining | 7.6 | L | no |
+| **Accounts + cross-device sync** | **8.0** | **XL** | **yes — D1 + auth** |
+| Browser extension | 8.1 | XL | reuses API |
+| CLI + public API | 8.2 | XL | yes (needs 8.0) |
+| Multimodal + document context | 8.3 | XL | vision model path |
+| Voice input | 8.4 | M | no |
+| Community template gallery / marketplace | 8.5 | XL | yes (needs 8.0) |
+| Team features (shared libs, comments, review) | 8.6 | XL | yes (needs 8.0) |
+| Personal prompt analytics | 8.7 | M | best w/ 8.0 |
+| Library intelligence (auto-tag / dedup) | 8.8 | M | no (client-side OK) |
+| Context manager / modular components | 8.9 | L | best w/ 8.0 |
+
+### Explicitly parked (revisit only on evidence — see §3 + Phase 8 notes)
+Billing/pricing pages · full multi-model A/B matrix as the default flow · CodeMirror/Monaco +
+react-diff-viewer (framework creep) · dark-IDE three-panel shell · standalone marketing landing
+page. These were rejected for cause; the decision, not just the idea, is recorded so a future
+session doesn't "rediscover" them.
