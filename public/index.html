@@ -1704,6 +1704,8 @@
         <div class="card-header">
           <span class="card-header-title">Raw prompt</span>
           <div class="raw-prompt-meta">
+            <button class="clear-btn" id="uploadBtn" title="Click to browse, or drag & drop a file onto the box above. Supported formats: .txt and .md">📎 Upload</button>
+            <input type="file" id="rawPromptFileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none;">
             <button class="clear-btn" id="clearBtn">✕ Clear</button>
             <span class="mono" id="charCount">0 / 5000</span>
           </div>
@@ -1906,15 +1908,12 @@
           </select>
         </div>
         <div class="form-field" id="settingsHostedModelGroup">
-          <label for="settingsHostedModel">Hosted Free Model <span class="info-dot tooltip-trigger" tabindex="0">i<span class="tooltip-bubble" role="tooltip" style="font-weight: normal; text-transform: none; text-align: left; max-width: 280px; letter-spacing: normal; font-size: 12px; line-height: 1.45;">We offer fallback access to these free fallback models. Note that shared keys can be rate-limited. If a model fails or times out, choose another model or bring your own key.</span></span></label>
+          <label for="settingsHostedModel">Pick free AI model <span class="info-dot tooltip-trigger" tabindex="0">i<span class="tooltip-bubble" role="tooltip" style="font-weight: normal; text-transform: none; text-align: left; max-width: 280px; letter-spacing: normal; font-size: 12px; line-height: 1.45;">We offer fallback access to these free fallback models. Note that shared keys can be rate-limited. If a model fails or times out, choose another model or bring your own key.</span></span></label>
           <select class="form-select" id="settingsHostedModel">
             <option value="">Auto fallback (tries all in order)</option>
-            <option value="groq/llama-3.3-70b-versatile">Groq: Llama 3.3 70B (Fastest & best instruction following)</option>
-            <option value="google/gemini-3.5-flash">Gemini: 3.5 Flash (Super fast & smart)</option>
-            <option value="google/gemini-3.1-flash-lite">Gemini: 3.1 Flash-Lite (Ultra fast, light)</option>
-            <option value="nvidia/stepfun-ai/step-3.7-flash">NVIDIA NIM: Step-3.7-Flash (Fast & structured)</option>
-            <option value="nvidia/minimaxai/minimax-m3">NVIDIA NIM: Minimax-M3 (Highest accuracy)</option>
-            <option value="openrouter/nvidia/nemotron-3-ultra-550b-a55b:free">OpenRouter: Nemotron 3 Ultra 550B (Smart but slow)</option>
+            <option value="google/gemini-3.1-flash-lite" selected>Gemini: 3.1 Flash-Lite (Ultra fast, light)</option>
+            <option value="groq/openai/gpt-oss-120b">Groq: GPT-OSS 120B (Fast, less terse than Llama)</option>
+            <option value="openrouter/openrouter/free">OpenRouter: Free Router (auto-picks a free model)</option>
           </select>
           <span class="form-hint" id="settingsHostedModelNote" style="display:none; margin-top:6px; font-style:italic;"></span>
         </div>
@@ -2464,7 +2463,7 @@
         google: { model: 'gemini-3.5-flash' },
         openrouter: { model: 'nvidia/nemotron-3-ultra-550b-a55b:free' },
         nvidia: { model: 'minimaxai/minimax-m3' },
-        groq: { model: 'llama-3.3-70b-versatile' },
+        groq: { model: 'openai/gpt-oss-120b' },
         'opencode-go': { model: 'opencode-go/kimi-k2.7-code' },
         'opencode-zen': { model: 'opencode/gpt-5.5' },
         cloudflare: { model: '@cf/meta/llama-3.1-8b-instruct' },
@@ -2473,12 +2472,26 @@
       };
 
       function loadSettings() {
+        var settings;
         try {
           var raw = localStorage.getItem(SETTINGS_KEY);
-          return raw ? JSON.parse(raw) : { provider: '', apiKey: '', model: '', baseUrl: '', hostedModelPreset: '' };
+          settings = raw ? JSON.parse(raw) : {};
         } catch (e) {
-          return { provider: '', apiKey: '', model: '', baseUrl: '', hostedModelPreset: '' };
+          settings = {};
         }
+        settings.provider = settings.provider || '';
+        settings.hostedModelPreset = settings.hostedModelPreset || '';
+        settings.providerKeys = settings.providerKeys || {};
+        // Migrate the old single-slot apiKey/model/baseUrl fields (pre-per-provider-storage)
+        // into the new map, keyed by the provider they were saved under.
+        if (settings.apiKey && settings.provider && settings.provider !== 'hosted' && !settings.providerKeys[settings.provider]) {
+          settings.providerKeys[settings.provider] = {
+            apiKey: settings.apiKey,
+            model: settings.model || '',
+            baseUrl: settings.baseUrl || ''
+          };
+        }
+        return settings;
       }
 
       function saveSettingsObj(settings) {
@@ -2496,16 +2509,18 @@
           }
           return {};
         }
-        var fields = { provider: settings.provider, api_key: settings.apiKey };
-        if (settings.model) fields.model = settings.model;
-        if (settings.baseUrl) fields.base_url = settings.baseUrl;
+        var stored = settings.providerKeys[settings.provider] || {};
+        var fields = { provider: settings.provider, api_key: stored.apiKey || '' };
+        if (stored.model) fields.model = stored.model;
+        if (stored.baseUrl) fields.base_url = stored.baseUrl;
         return fields;
       }
 
       function refreshEngineChip() {
         var settings = loadSettings();
-        if (settings.apiKey && settings.provider && settings.provider !== 'hosted') {
-          engineChip.textContent = '● ' + settings.provider + ' (' + (settings.model || 'default') + ')';
+        var stored = (settings.provider && settings.provider !== 'hosted') ? (settings.providerKeys[settings.provider] || {}) : {};
+        if (stored.apiKey && settings.provider && settings.provider !== 'hosted') {
+          engineChip.textContent = '● ' + settings.provider + ' (' + (stored.model || 'default') + ')';
           engineChip.classList.remove('offline');
           return;
         }
@@ -2554,39 +2569,56 @@
       var settingsFreeKeyHint = document.getElementById('settingsFreeKeyHint');
 
       var HOSTED_MODEL_DESCRIPTIONS = {
-        '': 'Tries all available free models in order (Groq Llama -> Gemini -> NVIDIA NIM -> OpenRouter) to ensure successful optimization even if some are rate-limited.',
-        'groq/llama-3.3-70b-versatile': 'Llama 3.3 70B: Blazing fast response (~200 tps) with excellent instruction following. Highly recommended.',
-        'google/gemini-3.5-flash': 'Gemini 3.5 Flash: Best overall intelligence for complex prompt formatting and logic.',
+        '': 'Tries all available free models in order (Groq -> Gemini -> NVIDIA NIM -> OpenRouter) to ensure successful optimization even if some are rate-limited.',
         'google/gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite: Extremely fast response times, best for simple optimizations.',
-        'nvidia/stepfun-ai/step-3.7-flash': 'Step-3.7-Flash: Excellent formatting compliance and structural parsing.',
-        'nvidia/minimaxai/minimax-m3': 'Minimax-M3: Highest instruction-following accuracy in evaluations.',
-        'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free': 'Nemotron 3 Ultra 550B: Smart fallback reasoning, but can be slow.'
+        'groq/openai/gpt-oss-120b': 'GPT-OSS 120B on Groq: fast like Llama 3.3 70B, but noticeably more thorough output.',
+        'openrouter/openrouter/free': 'OpenRouter Free Router: automatically routes to whichever free-tier model is available right now.'
       };
+
+      // In-memory cache of per-provider BYOK fields while the modal is open,
+      // seeded from settings.providerKeys on open and persisted back on Save.
+      // Keeps a key you typed for provider A intact when you switch to B and back,
+      // instead of it being wiped by whatever the single set of inputs last held.
+      var editingProviderKeys = {};
+      var settingsProviderPrev = '';
+
+      function captureCurrentProviderFields(provider) {
+        if (provider && provider !== 'hosted') {
+          editingProviderKeys[provider] = {
+            apiKey: settingsApiKey.value.trim(),
+            model: settingsModel.value.trim(),
+            baseUrl: settingsBaseUrl.value.trim()
+          };
+        }
+      }
+
+      function loadProviderFieldsIntoInputs(provider) {
+        var stored = editingProviderKeys[provider] || {};
+        settingsApiKey.value = stored.apiKey || '';
+        settingsModel.value = stored.model || (PROVIDER_DEFAULTS[provider] || {}).model || '';
+        settingsBaseUrl.value = stored.baseUrl || '';
+      }
 
       function onProviderChange() {
         var provider = settingsProvider.value;
         var needsBaseUrl = provider === 'custom' || provider === 'cloudflare';
-        
+
+        settingsHostedModelGroup.style.display = 'flex';
+
         if (provider === 'hosted') { // Hosted fallback mode
-          settingsHostedModelGroup.style.display = 'flex';
           settingsApiKeyGroup.style.display = 'none';
           settingsModelGroup.style.display = 'none';
           settingsBaseUrlGroup.style.display = 'none';
           settingsFreeKeyHint.style.display = 'none';
-        } else if (!provider) { // Select provider placeholder
-          settingsHostedModelGroup.style.display = 'none';
+        } else if (!provider) { // Bring your own API key placeholder (no provider chosen yet)
           settingsApiKeyGroup.style.display = 'none';
           settingsModelGroup.style.display = 'none';
           settingsBaseUrlGroup.style.display = 'none';
           settingsFreeKeyHint.style.display = 'none';
         } else { // BYOK mode
-          settingsHostedModelGroup.style.display = 'none';
           settingsBaseUrlGroup.style.display = needsBaseUrl ? 'flex' : 'none';
           settingsApiKeyGroup.style.display = 'flex';
           settingsModelGroup.style.display = 'flex';
-          if (!settingsModel.value) {
-            settingsModel.value = (PROVIDER_DEFAULTS[provider] || {}).model || '';
-          }
 
           // Show specific free key helper links based on selected provider
           if (provider === 'google') {
@@ -2610,7 +2642,14 @@
         }
       }
 
-      settingsProvider.addEventListener('change', onProviderChange);
+      settingsProvider.addEventListener('change', function () {
+        captureCurrentProviderFields(settingsProviderPrev);
+        settingsProviderPrev = settingsProvider.value;
+        if (settingsProviderPrev && settingsProviderPrev !== 'hosted') {
+          loadProviderFieldsIntoInputs(settingsProviderPrev);
+        }
+        onProviderChange();
+      });
 
       settingsHostedModel.addEventListener('change', function () {
         var val = settingsHostedModel.value;
@@ -2620,11 +2659,17 @@
 
       function openSettings() {
         var settings = loadSettings();
+        editingProviderKeys = JSON.parse(JSON.stringify(settings.providerKeys || {}));
         settingsProvider.value = settings.provider || '';
-        settingsApiKey.value = settings.apiKey || '';
-        settingsModel.value = settings.model || '';
-        settingsBaseUrl.value = settings.baseUrl || '';
-        settingsHostedModel.value = settings.hostedModelPreset || '';
+        settingsProviderPrev = settingsProvider.value;
+        if (settingsProviderPrev && settingsProviderPrev !== 'hosted') {
+          loadProviderFieldsIntoInputs(settingsProviderPrev);
+        } else {
+          settingsApiKey.value = '';
+          settingsModel.value = '';
+          settingsBaseUrl.value = '';
+        }
+        settingsHostedModel.value = settings.hostedModelPreset || 'google/gemini-3.1-flash-lite';
 
         var val = settingsHostedModel.value;
         settingsHostedModelNote.style.display = 'block';
@@ -2648,16 +2693,13 @@
       });
 
       document.getElementById('settingsSave').addEventListener('click', function () {
-        var provider = settingsProvider.value;
-        var savedProvider = provider;
-        var needsBaseUrl = savedProvider === 'custom' || savedProvider === 'cloudflare';
+        var savedProvider = settingsProvider.value;
         var isHostedMode = savedProvider === 'hosted' || savedProvider === '';
+        captureCurrentProviderFields(savedProvider);
         saveSettingsObj({
           provider: savedProvider,
-          apiKey: isHostedMode ? '' : settingsApiKey.value.trim(),
-          model: isHostedMode ? '' : settingsModel.value.trim(),
-          baseUrl: needsBaseUrl ? settingsBaseUrl.value.trim() : '',
-          hostedModelPreset: isHostedMode ? settingsHostedModel.value : ''
+          hostedModelPreset: isHostedMode ? settingsHostedModel.value : '',
+          providerKeys: editingProviderKeys
         });
         refreshEngineChip();
         closeSettings();
@@ -2770,10 +2812,11 @@
         // Cost estimation
         var costText = '';
         var settings = loadSettings();
-        var model = data.model || settings.model || 'default';
+        var storedForModel = (settings.provider && settings.provider !== 'hosted') ? (settings.providerKeys[settings.provider] || {}) : {};
+        var model = data.model || storedForModel.model || 'default';
         var isFree = false;
 
-        var isHosted = !settings.apiKey || !settings.provider || settings.provider === 'hosted';
+        var isHosted = !storedForModel.apiKey || !settings.provider || settings.provider === 'hosted';
         
         if (isHosted || model.toLowerCase().indexOf('free') !== -1 || model.toLowerCase().indexOf(':free') !== -1) {
           isFree = true;
@@ -4528,6 +4571,21 @@
         e.preventDefault();
       }, false);
 
+      function loadFileIntoPrompt(file) {
+        if (!file) return;
+        if (!/\.(txt|md)$/i.test(file.name)) {
+          alert('Unsupported file type. Please upload a .txt or .md file.');
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function (evt) {
+          rawPrompt.value = evt.target.result;
+          updateInputState();
+          rawPrompt.dispatchEvent(new Event('input'));
+        };
+        reader.readAsText(file);
+      }
+
       if (rawPrompt) {
         rawPrompt.addEventListener('dragover', function (e) {
           e.preventDefault();
@@ -4547,18 +4605,19 @@
           rawPrompt.classList.remove('dragover');
 
           var files = e.dataTransfer.files;
-          if (files.length > 0) {
-            var file = files[0];
-            if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
-              var reader = new FileReader();
-              reader.onload = function (evt) {
-                rawPrompt.value = evt.target.result;
-                updateInputState();
-                rawPrompt.dispatchEvent(new Event('input'));
-              };
-              reader.readAsText(file);
-            }
-          }
+          if (files.length > 0) loadFileIntoPrompt(files[0]);
+        });
+      }
+
+      var uploadBtn = document.getElementById('uploadBtn');
+      var rawPromptFileInput = document.getElementById('rawPromptFileInput');
+      if (uploadBtn && rawPromptFileInput) {
+        uploadBtn.addEventListener('click', function () {
+          rawPromptFileInput.click();
+        });
+        rawPromptFileInput.addEventListener('change', function () {
+          if (rawPromptFileInput.files.length > 0) loadFileIntoPrompt(rawPromptFileInput.files[0]);
+          rawPromptFileInput.value = '';
         });
       }
 

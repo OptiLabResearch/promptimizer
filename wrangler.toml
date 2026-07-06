@@ -26,8 +26,9 @@ compatibility_date = "2024-09-23"
 # Provider order: Groq first (best speed), Google second, NVIDIA NIM third, OpenRouter last.
 HOSTED_PROVIDER = "groq,google,nvidia,openrouter"
 
-# Groq — Llama 3.3 70B: excellent instruction following and extremely fast.
-HOSTED_MODEL_GROQ = "llama-3.3-70b-versatile,llama-3.1-8b-instant"
+# Groq — GPT-OSS 120B first: much less terse than Llama 3.3 70B at similar
+# speed; Llama models kept as fallbacks if GPT-OSS is unavailable.
+HOSTED_MODEL_GROQ = "openai/gpt-oss-120b,llama-3.3-70b-versatile,llama-3.1-8b-instant"
 
 # Google — Gemini 3.5 Flash: 50.2 intelligence, 203 tps — best speed×quality balance overall.
 HOSTED_MODEL_GOOGLE = "gemini-3.5-flash,gemini-3.1-flash-lite"
@@ -38,5 +39,6 @@ HOSTED_MODEL_GOOGLE = "gemini-3.5-flash,gemini-3.1-flash-lite"
 # kimi-k2.6: 43 × 42 | nemotron-super: 25 × 332 | minimax-m2.7: 38 × 49 | qwen3.5-122b: 32 × 144
 HOSTED_MODEL_NVIDIA = "stepfun-ai/step-3.7-flash,moonshotai/kimi-k2.6,nvidia/nemotron-3-super-120b-a12b,minimaxai/minimax-m3,nvidia/nemotron-3-ultra-550b-a55b,minimaxai/minimax-m2.7,qwen/qwen3.5-122b-a10b,z-ai/glm-5.2,deepseek-ai/deepseek-v4-pro,deepseek-ai/deepseek-v4-flash"
 
-# OpenRouter free tier — last resort.
-HOSTED_MODEL_OPENROUTER = "nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-31b-it:free,openrouter/free"
+# OpenRouter free tier — last resort. openrouter/free and gemma tried first
+# since Nemotron 550B is slow enough to trip the 26s function deadline.
+HOSTED_MODEL_OPENROUTER = "openrouter/free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free"
