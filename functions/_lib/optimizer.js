@@ -586,7 +586,7 @@ async function fetchActiveModelsForProvider(provider, baseUrl, apiKey) {
     const tId = setTimeout(() => controller.abort(), 5000);
     let resp;
     try {
-      resp = await fetch(url, { headers, signal: controller.signal, redirect: "error" });
+      resp = await fetch(url, { headers, signal: controller.signal, redirect: "manual" });
     } finally {
       clearTimeout(tId);
     }
@@ -1046,7 +1046,7 @@ async function executeWithFallback(config, systemPrompt, userText, maxTokens, st
         headers,
         body: JSON.stringify(body),
         signal: controller.signal,
-        redirect: "error",
+        redirect: "manual",
       });
 
       if (!resp.ok) {
