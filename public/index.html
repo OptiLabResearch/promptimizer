@@ -1556,22 +1556,196 @@
     font-size: 12px;
   }
 
+  /* ---------- Hamburger Menu & Mobile Drawer ---------- */
+  .hamburger-menu-btn {
+    display: none;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-mid);
+    font-size: 16px;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+  .hamburger-menu-btn:hover {
+    border-color: var(--border-hover);
+    background: var(--control);
+  }
+
+  .mobile-menu-drawer {
+    position: fixed;
+    top: 0;
+    right: -280px;
+    width: 280px;
+    height: 100%;
+    background: var(--panel);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .mobile-menu-drawer.open {
+    right: 0;
+  }
+
+  .mobile-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    height: 56px;
+    box-sizing: border-box;
+  }
+
+  .mobile-menu-close {
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    color: var(--text-mut);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mobile-menu-close:hover {
+    color: var(--text-mid);
+  }
+
+  .mobile-menu-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  .mobile-menu-status {
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .mobile-menu-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mobile-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--panel-inset);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-soft);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .mobile-menu-item:hover {
+    background: var(--control);
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .mobile-menu-scrim {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+
+  .mobile-menu-scrim.open {
+    opacity: 1;
+    visibility: visible;
+  }
+
   /* ---------- Responsive ---------- */
   @media (max-width: 950px) {
     html, body { height: auto; overflow: visible; }
     body { overflow: visible; }
+
+    /* Center the topbar logo and show hamburger button */
+    .topbar {
+      position: relative;
+      justify-content: flex-end;
+      padding: 12px 20px;
+    }
+    .topbar .brand {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .topbar-actions {
+      display: none;
+    }
+    .hamburger-menu-btn {
+      display: flex;
+    }
+
     .workbench {
       display: flex;
       flex-direction: column;
       overflow: visible;
       gap: 16px;
+      padding: 16px 20px;
     }
     .input-col, .output-col {
       min-height: 380px;
       max-height: calc(100vh - 48px);
     }
-    .page-footer { flex-direction: column; align-items: flex-start; }
+    .page-footer {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 16px 20px;
+      gap: 12px;
+    }
     .bench-panel { width: 100%; }
+  }
+
+  @media (max-width: 600px) {
+    /* Hide raw prompt meta text labels, only show icons */
+    .raw-prompt-meta .btn-label {
+      display: none;
+    }
+
+    /* Allow card header items to wrap cleanly */
+    .card-header {
+      height: auto !important;
+      min-height: 56px;
+      padding: 10px 16px !important;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* Options body: change grid to single column */
+    .options-body {
+      grid-template-columns: 1fr !important;
+    }
+    .techniques-grid {
+      grid-template-columns: 1fr !important;
+    }
   }
 
   /* ---------- Guide Modal & Content Styles ---------- */
@@ -1832,6 +2006,7 @@
       <button class="btn-ghost" id="apiBtn">⚙ API</button>
       <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">◐</button>
     </div>
+    <button class="hamburger-menu-btn" id="hamburgerMenuBtn" aria-label="Open menu">☰</button>
   </header>
 
   <main class="workbench">
@@ -1841,12 +2016,12 @@
         <div class="card-header">
           <span class="card-header-title">Raw prompt</span>
           <div class="raw-prompt-meta">
-            <button class="clear-btn" id="uploadBtn" title="Click to browse, or drag & drop a file onto the box above. Supported formats: .txt and .md">📎 Upload</button>
+            <button class="clear-btn" id="uploadBtn" title="Click to browse, or drag & drop a file onto the box above. Supported formats: .txt and .md">📎 <span class="btn-label">Upload</span></button>
             <input type="file" id="rawPromptFileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none;">
-            <button class="clear-btn" id="imageBtn" title="Attach an image (PNG, JPEG, WEBP, HEIC, HEIF — max 7MB) to perform OCR and extract its text into the input box.">🖼️ Image</button>
+            <button class="clear-btn" id="imageBtn" title="Attach an image (PNG, JPEG, WEBP, HEIC, HEIF — max 7MB) to perform OCR and extract its text into the input box.">🖼️ <span class="btn-label">Image</span></button>
             <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" style="display:none;">
-            <button class="clear-btn" id="dictateBtn" title="Speak to dictate your prompt using browser speech recognition.">🎤 Dictate</button>
-            <button class="clear-btn" id="clearBtn">✕ Clear</button>
+            <button class="clear-btn" id="dictateBtn" title="Speak to dictate your prompt using browser speech recognition.">🎤 <span class="btn-label">Dictate</span></button>
+            <button class="clear-btn" id="clearBtn">✕ <span class="btn-label">Clear</span></button>
             <span class="mono" id="charCount">0 / 5000</span>
           </div>
         </div>
@@ -2382,6 +2557,30 @@
     </div>
   </div>
 
+  <!-- Mobile Menu Drawer -->
+  <div class="mobile-menu-drawer" id="mobileMenuDrawer">
+    <div class="mobile-menu-header">
+      <div class="brand">
+        <div class="logo-mark">P</div>
+        <span class="brand-name">Prompt Optimizer</span>
+      </div>
+      <button class="mobile-menu-close" id="mobileMenuCloseBtn" aria-label="Close menu">✕</button>
+    </div>
+    <div class="mobile-menu-body">
+      <div class="mobile-menu-status">
+        <span class="engine-chip mono" id="mobileEngineChip">● ready</span>
+      </div>
+      <nav class="mobile-menu-nav">
+        <button class="mobile-menu-item" id="mobileGuideBtn">📖 Guide</button>
+        <button class="mobile-menu-item" id="mobileLibraryBtn">★ Library</button>
+        <button class="mobile-menu-item" id="mobileHistoryBtn">↺ History</button>
+        <button class="mobile-menu-item" id="mobileApiBtn">⚙ API Settings</button>
+        <button class="mobile-menu-item" id="mobileThemeToggleBtn">◐ Toggle Theme</button>
+      </nav>
+    </div>
+  </div>
+  <div class="mobile-menu-scrim" id="mobileMenuScrim"></div>
+
   <script>
     (function () {
       var THEME_KEY = 'promptOptimizerTheme';
@@ -2619,6 +2818,21 @@
 
       // ---------- API settings modal ----------
       var engineChip = document.getElementById('engineChip');
+      var mobileEngineChip = document.getElementById('mobileEngineChip');
+
+      function updateEngineChipUI(text, isOffline) {
+        var chips = [engineChip, mobileEngineChip];
+        chips.forEach(function (chip) {
+          if (!chip) return;
+          chip.textContent = text;
+          if (isOffline) {
+            chip.classList.add('offline');
+          } else {
+            chip.classList.remove('offline');
+          }
+        });
+      }
+
       var SETTINGS_KEY = 'promptOptimizerSettings';
       var PROVIDER_DEFAULTS = {
         google: { model: 'gemini-3.5-flash' },
@@ -2681,23 +2895,20 @@
         var settings = loadSettings();
         var stored = (settings.provider && settings.provider !== 'hosted') ? (settings.providerKeys[settings.provider] || {}) : {};
         if (stored.apiKey && settings.provider && settings.provider !== 'hosted') {
-          engineChip.textContent = '● ' + settings.provider + ' (' + (stored.model || 'default') + ')';
-          engineChip.classList.remove('offline');
+          updateEngineChipUI('● ' + settings.provider + ' (' + (stored.model || 'default') + ')', false);
           return;
         }
         fetch('/api/optimize-prompt')
           .then(function (res) { return res.json(); })
           .then(function (data) {
             if (data && data.model) {
-              engineChip.textContent = '● ' + data.model + ' · live';
-              engineChip.classList.remove('offline');
+              updateEngineChipUI('● ' + data.model + ' · live', false);
             } else {
-              engineChip.textContent = '● ready';
-              engineChip.classList.remove('offline');
+              updateEngineChipUI('● ready', false);
             }
           })
           .catch(function () {
-            engineChip.textContent = '● ready';
+            updateEngineChipUI('● ready', false);
           });
       }
 
@@ -3583,8 +3794,7 @@
         saveBtn.textContent = '★ Save';
 
         if (data.model) {
-          engineChip.textContent = '● ' + data.model + ' · live';
-          engineChip.classList.remove('offline');
+          updateEngineChipUI('● ' + data.model + ' · live', false);
         }
 
         showStats(data, elapsed);
@@ -3599,8 +3809,7 @@
         renderOutputBody();
         emptyStateText.textContent = (err && err.message) || 'Something went wrong. Try again.';
         if (err && /no api key/i.test(err.message || '')) {
-          engineChip.textContent = '● mock · offline';
-          engineChip.classList.add('offline');
+          updateEngineChipUI('● mock · offline', true);
         }
       }
 
@@ -4306,8 +4515,7 @@
         }
 
         if (currentResult.model) {
-          engineChip.textContent = '● ' + currentResult.model + ' · live';
-          engineChip.classList.remove('offline');
+          updateEngineChipUI('● ' + currentResult.model + ' · live', false);
         }
 
         closeLibraryPanel();
@@ -5177,6 +5385,64 @@
           if (dictateStatus) dictateStatus.textContent = 'Speech recognition failed to start.';
           stopDictationSession();
         }
+      }
+
+      // ---------- Mobile Menu Drawer Logic ----------
+      var mobileMenuDrawer = document.getElementById('mobileMenuDrawer');
+      var mobileMenuScrim = document.getElementById('mobileMenuScrim');
+      var hamburgerMenuBtn = document.getElementById('hamburgerMenuBtn');
+      var mobileMenuCloseBtn = document.getElementById('mobileMenuCloseBtn');
+
+      function openMobileMenu() {
+        if (mobileMenuDrawer) mobileMenuDrawer.classList.add('open');
+        if (mobileMenuScrim) mobileMenuScrim.classList.add('open');
+      }
+
+      function closeMobileMenu() {
+        if (mobileMenuDrawer) mobileMenuDrawer.classList.remove('open');
+        if (mobileMenuScrim) mobileMenuScrim.classList.remove('open');
+      }
+
+      if (hamburgerMenuBtn) hamburgerMenuBtn.addEventListener('click', openMobileMenu);
+      if (mobileMenuCloseBtn) mobileMenuCloseBtn.addEventListener('click', closeMobileMenu);
+      if (mobileMenuScrim) mobileMenuScrim.addEventListener('click', closeMobileMenu);
+
+      var mobileGuideBtn = document.getElementById('mobileGuideBtn');
+      var mobileLibraryBtn = document.getElementById('mobileLibraryBtn');
+      var mobileHistoryBtn = document.getElementById('mobileHistoryBtn');
+      var mobileApiBtn = document.getElementById('mobileApiBtn');
+      var mobileThemeToggleBtn = document.getElementById('mobileThemeToggleBtn');
+
+      if (mobileGuideBtn) {
+        mobileGuideBtn.addEventListener('click', function () {
+          closeMobileMenu();
+          if (typeof openGuide === 'function') openGuide();
+        });
+      }
+      if (mobileLibraryBtn) {
+        mobileLibraryBtn.addEventListener('click', function () {
+          closeMobileMenu();
+          if (typeof openLibraryPanel === 'function') openLibraryPanel('library');
+        });
+      }
+      if (mobileHistoryBtn) {
+        mobileHistoryBtn.addEventListener('click', function () {
+          closeMobileMenu();
+          if (typeof openLibraryPanel === 'function') openLibraryPanel('history');
+        });
+      }
+      if (mobileApiBtn) {
+        mobileApiBtn.addEventListener('click', function () {
+          closeMobileMenu();
+          if (typeof openSettings === 'function') openSettings();
+        });
+      }
+      if (mobileThemeToggleBtn) {
+        mobileThemeToggleBtn.addEventListener('click', function () {
+          closeMobileMenu();
+          var desktopThemeToggle = document.getElementById('themeToggle');
+          if (desktopThemeToggle) desktopThemeToggle.click();
+        });
       }
 
       renderOutputBody();
