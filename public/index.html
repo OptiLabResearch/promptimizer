@@ -5084,7 +5084,7 @@
         startBrowserSpeech();
       }
 
-      function stopDictationSession() {
+      function stopDictationSession(statusText) {
         if (!isRecording) return;
         isRecording = false;
 
@@ -5100,7 +5100,9 @@
           recognition.onresult = null;
           recognition.stop();
         }
-        if (dictateStatus) dictateStatus.textContent = 'Ready to dictate';
+        if (dictateStatus) {
+          dictateStatus.textContent = statusText || 'Ready to dictate';
+        }
       }
 
       function startBrowserSpeech() {
@@ -5110,16 +5112,27 @@
           recognition.interimResults = true;
           recognition.lang = 'en-US';
 
-          var startVal = rawPrompt.value;
-          if (startVal && !startVal.endsWith(' ')) {
-            startVal += ' ';
+          var startPos = rawPrompt.selectionStart;
+          var endPos = rawPrompt.selectionEnd;
+          var originalText = rawPrompt.value;
+          var before = '';
+          var after = '';
+
+          if (startPos !== undefined && endPos !== undefined) {
+            before = originalText.substring(0, startPos);
+            after = originalText.substring(endPos, originalText.length);
+            if (before && !before.endsWith(' ')) before += ' ';
+            if (after && !after.startsWith(' ')) after = ' ' + after;
+          } else {
+            before = originalText;
+            if (before && !before.endsWith(' ')) before += ' ';
           }
 
           recognition.onresult = function (event) {
             var finalTranscript = '';
             var interimTranscript = '';
 
-            for (var i = event.resultIndex; i < event.results.length; ++i) {
+            for (var i = 0; i < event.results.length; ++i) {
               if (event.results[i].isFinal) {
                 finalTranscript += event.results[i][0].transcript;
               } else {
@@ -5127,10 +5140,11 @@
               }
             }
 
-            if (finalTranscript) {
-              rawPrompt.value = startVal + finalTranscript;
-              updateInputState();
-            }
+            rawPrompt.value = before + finalTranscript + interimTranscript + after;
+            var currentInsertLen = finalTranscript.length + interimTranscript.length;
+            rawPrompt.selectionStart = before.length + currentInsertLen;
+            rawPrompt.selectionEnd = before.length + currentInsertLen;
+            updateInputState();
 
             if (dictateStatus) {
               if (interimTranscript) {
@@ -5143,12 +5157,17 @@
 
           recognition.onerror = function (event) {
             console.error('Speech recognition error:', event.error);
-            if (dictateStatus) dictateStatus.textContent = 'Error: ' + event.error;
-            stopDictationSession();
+            var errMsg = 'Error: ' + event.error;
+            if (event.error === 'not-allowed') {
+              errMsg = 'Error: Mic permission denied. Please allow mic access.';
+            } else if (event.error === 'audio-capture') {
+              errMsg = 'Error: No microphone detected.';
+            }
+            stopDictationSession(errMsg);
           };
 
           recognition.onend = function () {
-            stopDictationSession();
+            stopDictationSession('Dictation finished');
           };
 
           recognition.start();
