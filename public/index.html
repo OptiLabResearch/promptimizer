@@ -1706,7 +1706,7 @@
           <div class="raw-prompt-meta">
             <button class="clear-btn" id="uploadBtn" title="Click to browse, or drag & drop a file onto the box above. Supported formats: .txt and .md">📎 Upload</button>
             <input type="file" id="rawPromptFileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none;">
-            <button class="clear-btn" id="imageBtn" title="Attach an image (PNG, JPEG, WEBP, HEIC, HEIF — max 7MB). Only works with a vision-capable model, e.g. Gemini.">🖼️ Image</button>
+            <button class="clear-btn" id="imageBtn" title="Attach an image (PNG, JPEG, WEBP, HEIC, HEIF — max 7MB) to perform OCR and extract its text into the input box.">🖼️ Image</button>
             <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" style="display:none;">
             <button class="clear-btn" id="clearBtn">✕ Clear</button>
             <span class="mono" id="charCount">0 / 5000</span>
@@ -2344,12 +2344,17 @@
       var clearBtn = document.getElementById('clearBtn');
       var optimizeBtn = document.getElementById('optimizeBtn');
       var MAX_LEN = 5000;
+      var ocrInProgress = false;
 
       function updateInputState() {
         if (typeof status !== 'undefined' && status === 'loading') return;
         var len = rawPrompt.value.length;
         charCount.textContent = len + ' / ' + MAX_LEN;
-        optimizeBtn.disabled = len === 0;
+        if (ocrInProgress) {
+          optimizeBtn.disabled = true;
+        } else {
+          optimizeBtn.disabled = len === 0;
+        }
       }
 
       rawPrompt.addEventListener('input', updateInputState);
@@ -4615,7 +4620,14 @@
           rawPrompt.classList.remove('dragover');
 
           var files = e.dataTransfer.files;
-          if (files.length > 0) loadFileIntoPrompt(files[0]);
+          if (files.length > 0) {
+            var file = files[0];
+            if (file.type && file.type.indexOf('image/') === 0) {
+              loadImageIntoAttachment(file);
+            } else {
+              loadFileIntoPrompt(file);
+            }
+          }
         });
       }
 
@@ -4648,6 +4660,84 @@
         if (imagePreviewThumb) imagePreviewThumb.src = '';
       }
 
+      function loadTesseract(callback) {
+        if (window.Tesseract) {
+          callback();
+          return;
+        }
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        script.onload = function() {
+          callback();
+        };
+        script.onerror = function() {
+          alert('Failed to load OCR engine. Please check your internet connection.');
+          ocrInProgress = false;
+          updateInputState();
+          if (imagePreviewName) {
+            imagePreviewName.textContent = 'Failed to load OCR library';
+          }
+        };
+        document.head.appendChild(script);
+      }
+
+      function performOCR(file) {
+        ocrInProgress = true;
+        updateInputState();
+        if (optimizeBtn) {
+          optimizeBtn.innerHTML = '<span class="spinner"></span>Extracting text...';
+        }
+
+        loadTesseract(function() {
+          Tesseract.recognize(
+            file,
+            'eng',
+            {
+              logger: function(m) {
+                if (m.status === 'recognizing text') {
+                  var pct = Math.round(m.progress * 100);
+                  if (imagePreviewName) {
+                    imagePreviewName.textContent = file.name + ' (Extracting text: ' + pct + '%)';
+                  }
+                }
+              }
+            }
+          ).then(function(result) {
+            var text = result.data.text;
+            if (text && text.trim()) {
+              var rawPromptTextarea = document.getElementById('rawPrompt');
+              if (rawPromptTextarea) {
+                var currentVal = rawPromptTextarea.value;
+                if (currentVal.trim()) {
+                  rawPromptTextarea.value = currentVal.trim() + '\n\n' + text.trim();
+                } else {
+                  rawPromptTextarea.value = text.trim();
+                }
+                rawPromptTextarea.dispatchEvent(new Event('input'));
+              }
+              if (imagePreviewName) {
+                imagePreviewName.textContent = file.name + ' (Text extracted successfully)';
+              }
+            } else {
+              if (imagePreviewName) {
+                imagePreviewName.textContent = file.name + ' (No text found in image)';
+              }
+            }
+          }).catch(function(err) {
+            console.error('OCR failed:', err);
+            if (imagePreviewName) {
+              imagePreviewName.textContent = file.name + ' (OCR failed)';
+            }
+          }).finally(function() {
+            ocrInProgress = false;
+            if (optimizeBtn) {
+              optimizeBtn.innerHTML = '✦ Optimize prompt';
+            }
+            updateInputState();
+          });
+        });
+      }
+
       function loadImageIntoAttachment(file) {
         if (!file) return;
         if (SUPPORTED_IMAGE_TYPES.indexOf(file.type) === -1) {
@@ -4662,8 +4752,10 @@
         reader.onload = function (evt) {
           attachedImage = { dataUrl: evt.target.result, name: file.name };
           if (imagePreviewThumb) imagePreviewThumb.src = attachedImage.dataUrl;
-          if (imagePreviewName) imagePreviewName.textContent = file.name;
+          if (imagePreviewName) imagePreviewName.textContent = file.name + ' (Extracting text...)';
           if (imagePreview) imagePreview.style.display = 'flex';
+          
+          performOCR(file);
         };
         reader.readAsDataURL(file);
       }
