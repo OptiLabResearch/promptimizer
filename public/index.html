@@ -1678,6 +1678,143 @@
     outline-offset: -4px;
     border-radius: 0 0 12px 12px;
   }
+
+  /* Dictation Panel Styles */
+  .raw-prompt-dictate-panel {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-mid);
+    background: var(--panel-inset);
+  }
+
+  .dictate-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+  }
+
+  .recording-pulse {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ef4444; /* danger red */
+    display: inline-block;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    animation: pulse-red 1.5s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse-red {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+    }
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+  }
+
+  .dictate-level-container {
+    flex: 1;
+    height: 6px;
+    background: var(--control);
+    border-radius: 3px;
+    overflow: hidden;
+    display: none; /* Only shown when recording or processing */
+  }
+
+  .dictate-level-bar {
+    width: 0%;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.1s ease, background-color 0.3s ease;
+    border-radius: 3px;
+  }
+
+  /* When transcribing/loading, show a subtle pulse gradient */
+  .dictate-level-bar.transcribing {
+    width: 100% !important;
+    background: linear-gradient(90deg, var(--accent) 25%, var(--accent-deep) 50%, var(--accent) 75%);
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.5s infinite linear;
+  }
+
+  @keyframes loading-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .dictate-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .dictate-select {
+    padding: 3px 8px;
+    font-size: 12px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .dictate-select:focus {
+    border-color: var(--accent);
+  }
+
+  .dictate-btn-action {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    font-size: 12px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .dictate-btn-action.record {
+    background: var(--accent);
+    color: #ffffff;
+  }
+  .dictate-btn-action.record:hover {
+    background: var(--accent-deep);
+  }
+
+  .dictate-btn-action.stop {
+    background: #ef4444;
+    color: #ffffff;
+  }
+  .dictate-btn-action.stop:hover {
+    background: #dc2626;
+  }
+
+  .dictate-btn-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 </style>
 </head>
 <body>
@@ -1708,6 +1845,7 @@
             <input type="file" id="rawPromptFileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none;">
             <button class="clear-btn" id="imageBtn" title="Attach an image (PNG, JPEG, WEBP, HEIC, HEIF — max 7MB) to perform OCR and extract its text into the input box.">🖼️ Image</button>
             <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" style="display:none;">
+            <button class="clear-btn" id="dictateBtn" title="Speak to dictate your prompt. Supports real-time browser speech or Groq Whisper (if configured).">🎤 Dictate</button>
             <button class="clear-btn" id="clearBtn">✕ Clear</button>
             <span class="mono" id="charCount">0 / 5000</span>
           </div>
@@ -1716,6 +1854,23 @@
           <img id="imagePreviewThumb" style="width:32px; height:32px; object-fit:cover; border-radius:4px; border:1px solid var(--border);">
           <span id="imagePreviewName" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
           <button class="clear-btn" id="imageRemoveBtn" title="Remove image">✕</button>
+        </div>
+        <div class="raw-prompt-dictate-panel" id="dictatePanel" style="display:none;">
+          <div class="dictate-status-indicator">
+            <span class="recording-pulse" id="dictatePulse" style="display:none;"></span>
+            <span id="dictateStatus">Ready to dictate</span>
+          </div>
+          <div class="dictate-level-container" id="dictateLevelContainer">
+            <div class="dictate-level-bar" id="dictateLevelBar"></div>
+          </div>
+          <div class="dictate-controls">
+            <select id="dictateSourceSelect" class="dictate-select">
+              <option value="speech-api" selected>Browser (Real-time)</option>
+              <option value="whisper">Groq Whisper (STT)</option>
+            </select>
+            <button class="dictate-btn-action record" id="dictateActionBtn">Record</button>
+            <button class="clear-btn" id="dictateCloseBtn" title="Close dictation panel" style="margin-left:4px;">✕</button>
+          </div>
         </div>
         <div class="raw-prompt-body">
           <textarea id="rawPrompt" maxlength="5000" placeholder="Paste or write your rough prompt here…"></textarea>
@@ -3239,7 +3394,7 @@
         var list = readList(LIBRARY_KEY);
         list.push({
           id: id,
-          name: 'Prompt ' + new Date().toLocaleDateString(),
+          name: getPromptSummary(promptText),
           tags: [],
           input: promptText,
           options: options,
@@ -3791,7 +3946,11 @@
           
           var nameSpan = document.createElement('span');
           nameSpan.className = 'lib-item-name';
-          nameSpan.textContent = item.name || 'Untitled Prompt';
+          var displayName = item.name;
+          if (!displayName || displayName === 'Untitled Prompt' || /^Prompt \d+[\.\/\-]\d+[\.\/\-]\d+/.test(displayName)) {
+            displayName = getPromptSummary(item.input);
+          }
+          nameSpan.textContent = displayName;
           nameSpan.title = 'Click to rename';
           nameSpan.addEventListener('click', function () {
             startRename(item.id, nameSpan);
@@ -4865,6 +5024,363 @@
       }
       if (imageRemoveBtn) {
         imageRemoveBtn.addEventListener('click', clearAttachedImage);
+      }
+
+      // ---------- Voice Dictation Logic ----------
+      var dictateBtn = document.getElementById('dictateBtn');
+      var dictatePanel = document.getElementById('dictatePanel');
+      var dictatePulse = document.getElementById('dictatePulse');
+      var dictateStatus = document.getElementById('dictateStatus');
+      var dictateLevelContainer = document.getElementById('dictateLevelContainer');
+      var dictateLevelBar = document.getElementById('dictateLevelBar');
+      var dictateSourceSelect = document.getElementById('dictateSourceSelect');
+      var dictateActionBtn = document.getElementById('dictateActionBtn');
+      var dictateCloseBtn = document.getElementById('dictateCloseBtn');
+
+      var isRecording = false;
+      var mediaRecorder = null;
+      var audioChunks = [];
+      var audioCtx = null;
+      var analyser = null;
+      var dataArray = null;
+      var sourceNode = null;
+      var micStream = null;
+      var levelAnimationId = null;
+
+      // Web Speech API references
+      var recognition = null;
+      var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      // If browser doesn't support Web Speech API, default to Whisper and disable browser option
+      if (!SpeechRecognition) {
+        var apiOption = dictateSourceSelect ? dictateSourceSelect.querySelector('option[value="speech-api"]') : null;
+        if (apiOption) {
+          apiOption.textContent = 'Browser (Unsupported)';
+          apiOption.disabled = true;
+          if (dictateSourceSelect) dictateSourceSelect.value = 'whisper';
+        }
+      }
+
+      if (dictateBtn) {
+        dictateBtn.addEventListener('click', function () {
+          if (!dictatePanel) return;
+          var isHidden = dictatePanel.style.display === 'none';
+          dictatePanel.style.display = isHidden ? 'flex' : 'none';
+          if (isHidden) {
+            dictateBtn.classList.add('active');
+          } else {
+            stopDictationSession(true);
+            dictateBtn.classList.remove('active');
+          }
+        });
+      }
+
+      if (dictateCloseBtn) {
+        dictateCloseBtn.addEventListener('click', function () {
+          stopDictationSession(true);
+          if (dictatePanel) dictatePanel.style.display = 'none';
+          if (dictateBtn) dictateBtn.classList.remove('active');
+        });
+      }
+
+      if (dictateActionBtn) {
+        dictateActionBtn.addEventListener('click', function () {
+          if (isRecording) {
+            stopDictationSession(false); // Stop and process
+          } else {
+            startDictationSession();
+          }
+        });
+      }
+
+      function startDictationSession() {
+        if (!dictateActionBtn || !dictateSourceSelect || !dictatePulse || !dictateLevelContainer || !dictateLevelBar || !dictateStatus) return;
+        var mode = dictateSourceSelect.value;
+        isRecording = true;
+        dictateActionBtn.textContent = 'Stop';
+        dictateActionBtn.className = 'dictate-btn-action stop';
+        dictatePulse.style.display = 'inline-block';
+        dictateLevelContainer.style.display = 'block';
+        dictateLevelBar.style.width = '0%';
+        dictateLevelBar.classList.remove('transcribing');
+        dictateSourceSelect.disabled = true;
+        dictateStatus.textContent = 'Listening...';
+
+        if (mode === 'speech-api') {
+          startBrowserSpeech();
+        } else {
+          startWhisperRecording();
+        }
+      }
+
+      function stopDictationSession(cancel) {
+        if (!isRecording) return;
+        isRecording = false;
+
+        if (dictateActionBtn) {
+          dictateActionBtn.textContent = 'Record';
+          dictateActionBtn.className = 'dictate-btn-action record';
+        }
+        if (dictatePulse) dictatePulse.style.display = 'none';
+        if (dictateSourceSelect) dictateSourceSelect.disabled = false;
+
+        // Stop micro level monitoring animation
+        if (levelAnimationId) {
+          cancelAnimationFrame(levelAnimationId);
+          levelAnimationId = null;
+        }
+
+        // Close mic stream
+        if (micStream) {
+          micStream.getTracks().forEach(function (track) { track.stop(); });
+          micStream = null;
+        }
+
+        if (audioCtx && audioCtx.state !== 'closed') {
+          audioCtx.close();
+          audioCtx = null;
+        }
+
+        var mode = dictateSourceSelect ? dictateSourceSelect.value : 'speech-api';
+        if (mode === 'speech-api') {
+          if (recognition) {
+            recognition.onend = null;
+            recognition.onerror = null;
+            recognition.onresult = null;
+            recognition.stop();
+          }
+          if (dictateLevelContainer) dictateLevelContainer.style.display = 'none';
+          if (dictateStatus) dictateStatus.textContent = 'Ready to dictate';
+        } else {
+          if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+          }
+          if (cancel) {
+            audioChunks = [];
+            if (dictateLevelContainer) dictateLevelContainer.style.display = 'none';
+            if (dictateStatus) dictateStatus.textContent = 'Ready to dictate';
+          } else {
+            if (dictateStatus) dictateStatus.textContent = 'Transcribing audio...';
+            if (dictateLevelBar) dictateLevelBar.classList.add('transcribing');
+            if (dictateActionBtn) dictateActionBtn.disabled = true;
+            // Wait for mediaRecorder 'stop' event to finish and call uploadAudio
+          }
+        }
+      }
+
+      function startBrowserSpeech() {
+        try {
+          recognition = new SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-US';
+
+          var startVal = rawPrompt.value;
+          if (startVal && !startVal.endsWith(' ')) {
+            startVal += ' ';
+          }
+
+          recognition.onresult = function (event) {
+            var finalTranscript = '';
+            var interimTranscript = '';
+
+            for (var i = event.resultIndex; i < event.results.length; ++i) {
+              if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+              } else {
+                interimTranscript += event.results[i][0].transcript;
+              }
+            }
+
+            if (finalTranscript) {
+              rawPrompt.value = startVal + finalTranscript;
+              updateInputState();
+            }
+
+            if (dictateStatus) {
+              if (interimTranscript) {
+                dictateStatus.textContent = 'Listening: ' + interimTranscript;
+              } else {
+                dictateStatus.textContent = 'Listening...';
+              }
+            }
+          };
+
+          recognition.onerror = function (event) {
+            console.error('Speech recognition error:', event.error);
+            if (dictateStatus) dictateStatus.textContent = 'Error: ' + event.error;
+            stopDictationSession(true);
+          };
+
+          recognition.onend = function () {
+            stopDictationSession(true);
+          };
+
+          recognition.start();
+
+          navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(function (stream) {
+              micStream = stream;
+              setupAudioAnalyser(stream);
+            })
+            .catch(function (err) {
+              console.warn('Could not monitor mic level:', err);
+            });
+
+        } catch (e) {
+          console.error(e);
+          if (dictateStatus) dictateStatus.textContent = 'Speech recognition failed to start.';
+          stopDictationSession(true);
+        }
+      }
+
+      function startWhisperRecording() {
+        audioChunks = [];
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(function (stream) {
+            micStream = stream;
+            
+            var mimeType = 'audio/webm';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = 'audio/ogg';
+            }
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = '';
+            }
+
+            var options = mimeType ? { mimeType: mimeType } : {};
+            mediaRecorder = new MediaRecorder(stream, options);
+
+            mediaRecorder.ondataavailable = function (event) {
+              if (event.data && event.data.size > 0) {
+                audioChunks.push(event.data);
+              }
+            };
+
+            mediaRecorder.onstop = function () {
+              var audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+              audioChunks = [];
+              uploadAudio(audioBlob);
+            };
+
+            mediaRecorder.start(250);
+            setupAudioAnalyser(stream);
+          })
+          .catch(function (err) {
+            console.error('Microphone access denied or failed:', err);
+            if (dictateStatus) dictateStatus.textContent = 'Mic permission denied.';
+            stopDictationSession(true);
+          });
+      }
+
+      function setupAudioAnalyser(stream) {
+        try {
+          var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContextClass();
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 256;
+          
+          sourceNode = audioCtx.createMediaStreamSource(stream);
+          sourceNode.connect(analyser);
+
+          var bufferLength = analyser.frequencyBinCount;
+          dataArray = new Uint8Array(bufferLength);
+
+          function updateLevel() {
+            if (!isRecording) return;
+            levelAnimationId = requestAnimationFrame(updateLevel);
+            
+            analyser.getByteFrequencyData(dataArray);
+            var sum = 0;
+            for (var i = 0; i < bufferLength; i++) {
+              sum += dataArray[i];
+            }
+            var average = sum / bufferLength;
+            var levelPercent = Math.min(100, Math.round((average / 80) * 100));
+            if (dictateLevelBar) dictateLevelBar.style.width = levelPercent + '%';
+          }
+
+          updateLevel();
+        } catch (e) {
+          console.warn('Failed to set up visual audio analyser:', e);
+        }
+      }
+
+      function uploadAudio(blob) {
+        var formData = new FormData();
+        formData.append('file', blob, 'audio.webm');
+
+        var settings = loadSettings();
+        var stored = (settings.provider && settings.provider !== 'hosted') ? (settings.providerKeys[settings.provider] || {}) : {};
+        if (stored.apiKey && settings.provider !== 'hosted') {
+          formData.append('api_key', stored.apiKey);
+          formData.append('provider', settings.provider);
+          if (stored.model) formData.append('model', stored.model);
+          if (stored.baseUrl) formData.append('base_url', stored.baseUrl);
+        }
+
+        fetch('/api/transcribe', {
+          method: 'POST',
+          body: formData
+        })
+          .then(function (res) {
+            if (!res.ok) {
+              return res.json().then(function (err) {
+                throw new Error(err.error || 'Server error during transcription.');
+              });
+            }
+            return res.json();
+          })
+          .then(function (data) {
+            if (data && data.text) {
+              var text = data.text.trim();
+              if (text) {
+                var startPos = rawPrompt.selectionStart;
+                var endPos = rawPrompt.selectionEnd;
+                var originalText = rawPrompt.value;
+                
+                if (startPos !== undefined && endPos !== undefined) {
+                  var before = originalText.substring(0, startPos);
+                  var after = originalText.substring(endPos, originalText.length);
+                  
+                  if (before && !before.endsWith(' ')) before += ' ';
+                  if (after && !after.startsWith(' ')) after = ' ' + after;
+                  
+                  rawPrompt.value = before + text + after;
+                  
+                  var newPos = before.length + text.length;
+                  rawPrompt.selectionStart = newPos;
+                  rawPrompt.selectionEnd = newPos;
+                } else {
+                  if (originalText && !originalText.endsWith(' ')) {
+                    rawPrompt.value = originalText + ' ' + text;
+                  } else {
+                    rawPrompt.value = originalText + text;
+                  }
+                }
+                
+                updateInputState();
+                rawPrompt.focus();
+                if (dictateStatus) dictateStatus.textContent = 'Transcription complete!';
+              } else {
+                if (dictateStatus) dictateStatus.textContent = 'No speech detected.';
+              }
+            } else {
+              if (dictateStatus) dictateStatus.textContent = 'Transcription failed.';
+            }
+          })
+          .catch(function (err) {
+            console.error('STT upload failed:', err);
+            if (dictateStatus) dictateStatus.textContent = 'Error: ' + err.message;
+          })
+          .finally(function () {
+            if (dictateActionBtn) dictateActionBtn.disabled = false;
+            if (dictateLevelBar) {
+              dictateLevelBar.classList.remove('transcribing');
+              dictateLevelBar.style.width = '0%';
+            }
+            if (dictateLevelContainer) dictateLevelContainer.style.display = 'none';
+          });
       }
 
       renderOutputBody();
