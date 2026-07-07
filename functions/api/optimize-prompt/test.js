@@ -3,7 +3,7 @@ const assert = {
     if (!val) throw new Error(message || "Assertion failed");
   }
 };
-import { ValidationError, RateLimitError, resolveProviderConfig, callCompletion, buildOptimizePrompt, buildRefinePassPrompt, parseDelimitedResponse, iterSseEvents, enforceHostedRateLimit, prepareRequest } from "../../_lib/optimizer.js";
+import { ValidationError, RateLimitError, resolveProviderConfig, callCompletion, buildOptimizePrompt, buildRefinePassPrompt, parseDelimitedResponse, iterSseEvents, enforceHostedRateLimit, prepareRequest, verifyTurnstileToken } from "../../_lib/optimizer.js";
 
 function makeMockStream(chunks) {
   let index = 0;
@@ -217,6 +217,21 @@ export async function runUnitTests() {
     assert.ok(threw, "Should throw ValidationError on HEIC/HEIF for Anthropic");
   });
 
+  await runTest("verifyTurnstileToken throws on missing token", async () => {
+    let threw = false;
+    try {
+      await verifyTurnstileToken({}, { headers: new Map() }, { TURNSTILE_SECRET_KEY: "secret" });
+    } catch (e) {
+      if (e instanceof ValidationError && e.message.includes("Security verification")) threw = true;
+    }
+    assert.ok(threw, "Should throw ValidationError on missing token");
+  });
+
+  await runTest("verifyTurnstileToken bypasses when api_key is present", async () => {
+    // Should run without throwing since api_key is present (bypassing Turnstile)
+    await verifyTurnstileToken({ api_key: "my_key" }, {}, {});
+  });
+
   return results;
 }
 
@@ -245,7 +260,10 @@ export async function onRequestPost({ request, env }) {
 
   let config;
   try {
-    if (!String(body.api_key || "").trim()) await enforceHostedRateLimit(env, request);
+    if (!String(body.api_key || "").trim()) {
+      await verifyTurnstileToken(body, request, env);
+      await enforceHostedRateLimit(env, request);
+    }
     config = await resolveProviderConfig(body, env);
   } catch (e) {
     if (e instanceof ValidationError) return json({ ok: false, error: e.message }, 400);

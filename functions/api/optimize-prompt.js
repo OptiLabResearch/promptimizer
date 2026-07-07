@@ -9,15 +9,28 @@ import {
   enforceHostedRateLimit,
   validateImage,
   buildUserContent,
+  verifyTurnstileToken,
 } from "../_lib/optimizer.js";
 
 export async function onRequestGet({ env }) {
   try {
     const config = await resolveProviderConfig({}, env);
     const first = config.attempts[0];
-    return json({ ok: true, provider: first.provider || null, model: first.model || null, source: config.source });
+    return json({
+      ok: true,
+      provider: first.provider || null,
+      model: first.model || null,
+      source: config.source,
+      turnstile_site_key: env.TURNSTILE_SITE_KEY || null
+    });
   } catch (e) {
-    return json({ ok: true, provider: null, model: null, source: "none" });
+    return json({
+      ok: true,
+      provider: null,
+      model: null,
+      source: "none",
+      turnstile_site_key: env.TURNSTILE_SITE_KEY || null
+    });
   }
 }
 
@@ -43,7 +56,10 @@ export async function onRequestPost({ request, env }) {
 
   let systemPrompt, userText, config;
   try {
-    if (!String(body.api_key || "").trim()) await enforceHostedRateLimit(env, request);
+    if (!String(body.api_key || "").trim()) {
+      await verifyTurnstileToken(body, request, env);
+      await enforceHostedRateLimit(env, request);
+    }
     ({ systemPrompt, userText } = buildOptimizePrompt(body, rawPrompt));
     if (body.image) {
       validateImage(body.image);

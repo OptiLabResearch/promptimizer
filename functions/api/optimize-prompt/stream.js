@@ -8,6 +8,7 @@ import {
   enforceHostedRateLimit,
   validateImage,
   buildUserContent,
+  verifyTurnstileToken,
 } from "../../_lib/optimizer.js";
 
 export async function onRequestPost({ request, env }) {
@@ -29,7 +30,10 @@ export async function onRequestPost({ request, env }) {
 
   let systemPrompt, userText, config;
   try {
-    if (!String(body.api_key || "").trim()) await enforceHostedRateLimit(env, request);
+    if (!String(body.api_key || "").trim()) {
+      await verifyTurnstileToken(body, request, env);
+      await enforceHostedRateLimit(env, request);
+    }
     ({ systemPrompt, userText } = buildOptimizePrompt(body, rawPrompt));
     if (body.image) {
       validateImage(body.image);

@@ -2164,6 +2164,7 @@
     cursor: not-allowed;
   }
 </style>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
 
@@ -2263,6 +2264,9 @@
           </div>
 
         </div>
+
+        <!-- Cloudflare Turnstile Container -->
+        <div id="main-turnstile-container" style="display: none; padding: 0 16px 12px 16px; justify-content: center;"></div>
 
         <div class="raw-prompt-footer">
           <button class="cta-btn" id="optimizeBtn" disabled>✦ Optimize prompt</button>
@@ -2516,6 +2520,10 @@
         <div class="form-field">
           <label for="feedbackMessage">Message</label>
           <textarea class="form-input" id="feedbackMessage" rows="4" placeholder="What can we improve? Let us know..." style="resize: vertical; min-height: 80px;"></textarea>
+        </div>
+        <!-- Feedback Turnstile Container -->
+        <div class="form-field" style="display: flex; justify-content: center; margin-top: 4px;">
+          <div id="feedback-turnstile-container"></div>
         </div>
         <div class="bench-error" id="feedbackError" style="margin-top: 0;"></div>
       </div>
@@ -3181,13 +3189,45 @@
         return fields;
       }
 
+      var turnstileSiteKey = null;
+      var mainTurnstileWidgetId = null;
+      var feedbackTurnstileId = null;
+
+      function initTurnstile(siteKey) {
+        turnstileSiteKey = siteKey;
+        if (!turnstileSiteKey || !window.turnstile) return;
+        
+        var mainContainer = document.getElementById('main-turnstile-container');
+        if (mainContainer && mainTurnstileWidgetId === null) {
+          mainTurnstileWidgetId = turnstile.render(mainContainer, {
+            sitekey: turnstileSiteKey,
+            theme: 'dark',
+            callback: function (token) {
+              console.log("Main Turnstile verified");
+            }
+          });
+        }
+      }
+
+      function resetMainTurnstile() {
+        if (window.turnstile && mainTurnstileWidgetId !== null) {
+          turnstile.reset(mainTurnstileWidgetId);
+        }
+      }
+
       function refreshEngineChip() {
         var settings = loadSettings();
         var stored = (settings.provider && settings.provider !== 'hosted') ? (settings.providerKeys[settings.provider] || {}) : {};
+        
+        var mainContainer = document.getElementById('main-turnstile-container');
         if (stored.apiKey && settings.provider && settings.provider !== 'hosted') {
           updateEngineChipUI('● ' + settings.provider + ' (' + (stored.model || 'default') + ')', false);
+          if (mainContainer) mainContainer.style.display = 'none';
           return;
         }
+        
+        if (mainContainer) mainContainer.style.display = 'flex';
+
         fetch('/api/optimize-prompt')
           .then(function (res) { return res.json(); })
           .then(function (data) {
@@ -3195,6 +3235,9 @@
               updateEngineChipUI('● ' + data.model + ' · live', false);
             } else {
               updateEngineChipUI('● ready', false);
+            }
+            if (data && data.turnstile_site_key) {
+              initTurnstile(data.turnstile_site_key);
             }
           })
           .catch(function () {
@@ -3934,6 +3977,11 @@
           techniques: state.techniques.slice()
         };
 
+        var turnstileToken = '';
+        if (window.turnstile && mainTurnstileWidgetId !== null) {
+          turnstileToken = turnstile.getResponse(mainTurnstileWidgetId);
+        }
+
         var payload = {
           prompt: promptText,
           strength: state.style,
@@ -3941,6 +3989,7 @@
           depth: state.quality,
           target_model: mapTarget(state.target),
           techniques: state.techniques.map(mapTechnique),
+          cf_turnstile_response: turnstileToken,
           ...(attachedImage ? { image: attachedImage.dataUrl } : {}),
           ...providerFields()
         };
@@ -4064,6 +4113,7 @@
       }
 
       function handleOptimizeSuccess(promptText, options, data) {
+        resetMainTurnstile();
         finishProgressBar();
         var elapsed = (Date.now() - optimizeStartTime) / 1000;
         currentResult = data;
@@ -4095,6 +4145,7 @@
       }
 
       function handleOptimizeError(err) {
+        resetMainTurnstile();
         failProgressBar();
         document.getElementById('statsStrip').style.display = 'none';
         status = 'idle';
@@ -4277,12 +4328,18 @@
           }
         }, 30000);
 
+        var turnstileToken = '';
+        if (window.turnstile && mainTurnstileWidgetId !== null) {
+          turnstileToken = turnstile.getResponse(mainTurnstileWidgetId);
+        }
+
         fetch('/api/optimize-prompt/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             original: mergeTestInput(promptText, bench.input),
             optimized: mergeTestInput(optimizedText, bench.input),
+            cf_turnstile_response: turnstileToken,
             ...providerFields()
           }),
           signal: signal
@@ -4314,6 +4371,7 @@
             }
           })
           .then(function () {
+            resetMainTurnstile();
             if (requestId !== benchRequestId) return;
             benchRun.disabled = false;
             benchRun.textContent = 'Run comparison';
@@ -5110,10 +5168,16 @@
         refineSubmitBtn.textContent = 'Refining…';
         refineInput.disabled = true;
 
+        var turnstileToken = '';
+        if (window.turnstile && mainTurnstileWidgetId !== null) {
+          turnstileToken = turnstile.getResponse(mainTurnstileWidgetId);
+        }
+
         var payload = {
           prompt: rawPrompt.value.trim(),
           previous_prompt: currentResult.optimized_prompt,
           refinement_instruction: instruction,
+          cf_turnstile_response: turnstileToken,
           ...providerFields()
         };
 
@@ -5156,6 +5220,7 @@
             alert((err && err.message) || 'Refinement failed.');
           })
           .then(function () {
+            resetMainTurnstile();
             refineSubmitBtn.disabled = false;
             refineSubmitBtn.textContent = 'Refine';
             refineInput.disabled = false;
@@ -5183,11 +5248,31 @@
         feedbackMessage.value = '';
         feedbackEmail.value = '';
         setFeedbackError('');
+
+        setTimeout(function () {
+          if (window.turnstile && turnstileSiteKey) {
+            if (feedbackTurnstileId !== null) {
+              turnstile.remove(feedbackTurnstileId);
+            }
+            feedbackTurnstileId = turnstile.render('#feedback-turnstile-container', {
+              sitekey: turnstileSiteKey,
+              theme: 'dark',
+              callback: function (token) {
+                console.log("Feedback Turnstile success token acquired.");
+              }
+            });
+          }
+        }, 200);
       }
 
       function closeFeedbackModal() {
         feedbackModal.classList.remove('open');
         feedbackModal.setAttribute('aria-hidden', 'true');
+
+        if (window.turnstile && feedbackTurnstileId !== null) {
+          turnstile.remove(feedbackTurnstileId);
+          feedbackTurnstileId = null;
+        }
       }
 
       feedbackClose.addEventListener('click', closeFeedbackModal);
@@ -5213,6 +5298,11 @@
         feedbackSend.disabled = true;
         feedbackSend.textContent = 'Sending…';
 
+        var turnstileToken = '';
+        if (window.turnstile && feedbackTurnstileId !== null) {
+          turnstileToken = turnstile.getResponse(feedbackTurnstileId);
+        }
+
         fetch(FEEDBACK_FORM_URL, {
           method: 'POST',
           headers: {
@@ -5221,7 +5311,8 @@
           },
           body: JSON.stringify({
             message: msg,
-            email: emailVal
+            email: emailVal,
+            'cf-turnstile-response': turnstileToken
           })
         })
           .then(function (res) {
@@ -5236,6 +5327,9 @@
             setFeedbackError((err && err.message) || 'Submission failed. Try again.');
           })
           .then(function () {
+            if (window.turnstile && feedbackTurnstileId !== null) {
+              turnstile.reset(feedbackTurnstileId);
+            }
             feedbackSend.disabled = false;
             feedbackSend.textContent = 'Send feedback';
           });

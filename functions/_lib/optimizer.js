@@ -1177,3 +1177,41 @@ export async function* iterSseEvents(body, signal) {
     reader.releaseLock();
   }
 }
+
+export async function verifyTurnstileToken(body, request, env) {
+  if (String(body.api_key || "").trim()) {
+    return;
+  }
+
+  const secretKey = env.TURNSTILE_SECRET_KEY;
+  if (!secretKey) {
+    console.warn("TURNSTILE_SECRET_KEY is not defined in environment variables. Bypassing validation.");
+    return;
+  }
+
+  const token = body.cf_turnstile_response;
+  if (!token) {
+    throw new ValidationError("Security verification required. Please complete the captcha check.");
+  }
+
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+
+  const formData = new FormData();
+  formData.append("secret", secretKey);
+  formData.append("response", token);
+  formData.append("remoteip", ip);
+
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: formData,
+    });
+    const outcome = await res.json();
+    if (!outcome.success) {
+      throw new ValidationError("Security verification failed. Please check the captcha and try again.");
+    }
+  } catch (err) {
+    if (err instanceof ValidationError) throw err;
+    throw new Error("Unable to verify security challenge: " + err.message);
+  }
+}
