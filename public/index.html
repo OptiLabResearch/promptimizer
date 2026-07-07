@@ -2738,6 +2738,61 @@
 
   <script>
     (function () {
+      // ---------- Anonymous Event Tracking (Cloudflare Analytics Engine) ----------
+      var VISITOR_KEY = 'prompt_optimizer_visitor_id';
+      var visitorId = localStorage.getItem(VISITOR_KEY);
+      if (!visitorId) {
+        visitorId = generateUUID();
+        localStorage.setItem(VISITOR_KEY, visitorId);
+      }
+
+      var SESSION_KEY = 'prompt_optimizer_session_id';
+      var sessionId = sessionStorage.getItem(SESSION_KEY);
+      var isNewSession = false;
+      if (!sessionId) {
+        sessionId = generateUUID();
+        sessionStorage.setItem(SESSION_KEY, sessionId);
+        isNewSession = true;
+      }
+
+      function generateUUID() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          var r = Math.random() * 16 | 0,
+              v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      }
+
+      function track(event, properties) {
+        var payload = {
+          event: event,
+          sessionId: sessionId,
+          visitorId: visitorId,
+          pasteToCopyTime: properties && properties.pasteToCopyTime
+        };
+        if (typeof navigator.sendBeacon === 'function') {
+          var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+          navigator.sendBeacon('/api/event', blob);
+        } else {
+          fetch('/api/event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            keepalive: true
+          }).catch(function() {});
+        }
+      }
+
+      if (isNewSession) {
+        track('session_start');
+      }
+
+      var lastPasteTime = null;
+      var placeholderFilledTracked = false;
+
       // Forking this project? Point this at your own Formspree endpoint (or
       // any endpoint accepting {message, email} JSON) so feedback goes to
       // you instead of the original deployment's inbox.
@@ -2865,6 +2920,9 @@
       }
 
       rawPrompt.addEventListener('input', updateInputState);
+      rawPrompt.addEventListener('paste', function () {
+        lastPasteTime = Date.now();
+      });
       updateInputState();
 
       clearBtn.addEventListener('click', function () {
@@ -2967,6 +3025,12 @@
           copyResetTimer = setTimeout(function () {
             copyBtn.textContent = '⧉ Copy prompt';
           }, 1600);
+
+          var pasteToCopyTime = null;
+          if (lastPasteTime) {
+            pasteToCopyTime = Date.now() - lastPasteTime;
+          }
+          track('copy', { pasteToCopyTime: pasteToCopyTime });
         });
       });
 
@@ -3754,6 +3818,7 @@
       }
 
       function addToLibrary(promptText, options, result) {
+        track('save_to_library');
         var id = 'lib_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
         var list = readList(LIBRARY_KEY);
         list.push({
@@ -3789,6 +3854,8 @@
       function runOptimize() {
         var promptText = rawPrompt.value.trim();
         if (!promptText) return;
+
+        track('optimize_run');
 
         resetEmptyText();
         startProgressBar();
@@ -4117,6 +4184,8 @@
           setBenchError('Optimize a prompt first — the bench compares your raw prompt against the optimized one.');
           return;
         }
+
+        track('test_both_run');
 
         setBenchError('');
         bench.input = benchInput.value.trim();
@@ -4827,6 +4896,10 @@
             input.addEventListener('input', function () {
               placeholderValues[ph] = input.value;
               updateCompiledText();
+              if (input.value.trim() && !placeholderFilledTracked) {
+                placeholderFilledTracked = true;
+                track('placeholder_filled');
+              }
             });
 
             field.appendChild(label);
@@ -5523,18 +5596,35 @@
             }
           };
 
+          var fatalError = false;
+
           recognition.onerror = function (event) {
             console.error('Speech recognition error:', event.error);
+            if (event.error === 'no-speech' || event.error === 'aborted') {
+              // Recoverable: browser paused listening due to silence. Let onend restart it.
+              return;
+            }
             var errMsg = 'Error: ' + event.error;
             if (event.error === 'not-allowed') {
               errMsg = 'Error: Mic permission denied. Please allow mic access.';
             } else if (event.error === 'audio-capture') {
               errMsg = 'Error: No microphone detected.';
             }
+            fatalError = true;
             stopDictationSession(errMsg);
           };
 
           recognition.onend = function () {
+            if (isRecording && !fatalError) {
+              // Browser auto-stopped the engine (e.g. after a silence timeout)
+              // even though continuous=true; restart to keep the session alive.
+              try {
+                recognition.start();
+                return;
+              } catch (e) {
+                console.error(e);
+              }
+            }
             stopDictationSession('Dictation finished');
           };
 

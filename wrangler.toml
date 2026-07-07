@@ -42,3 +42,7 @@ HOSTED_MODEL_NVIDIA = "stepfun-ai/step-3.7-flash,moonshotai/kimi-k2.6,nvidia/nem
 # OpenRouter free tier — last resort. openrouter/free and gemma tried first
 # since Nemotron 550B is slow enough to trip the 26s function deadline.
 HOSTED_MODEL_OPENROUTER = "openrouter/free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free"
+
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "prompt_optimizer_events"
