@@ -3937,7 +3937,8 @@
           return;
         }
 
-        filtered.forEach(function (item) {
+        var reversed = filtered.slice().reverse();
+        reversed.forEach(function (item) {
           var el = document.createElement('div');
           el.className = 'lib-item';
 
