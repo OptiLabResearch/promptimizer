@@ -2352,6 +2352,7 @@
       <a href="#" id="footerMethodology">Methodology</a>
       <a href="#" id="footerFeatures">Features</a>
       <a href="#" id="footerWhyThisExists">Why this exists</a>
+      <a href="#" id="footerPrivacy">Privacy Policy</a>
       <a href="https://github.com/OptiLabResearch/promptimizer" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/users/OptiLabResearch/projects/1/views/1" target="_blank" rel="noopener">Roadmap</a>
       <a href="#" class="feedback-pill" id="feedbackLink">💬 Give feedback</a>
@@ -2549,6 +2550,7 @@
           <button class="guide-tab-btn" data-guide-tab="models">Recommended Models</button>
           <button class="guide-tab-btn" data-guide-tab="manual">App Manual</button>
           <button class="guide-tab-btn" data-guide-tab="faq">FAQ &amp; Security</button>
+          <button class="guide-tab-btn" data-guide-tab="privacy">Privacy Policy</button>
         </div>
         <!-- Right content view -->
         <div class="guide-content-container">
@@ -2732,6 +2734,49 @@
             </ul>
             </p>
           </div>
+          <div class="guide-tab-content" id="guideTab_privacy" style="display: none;">
+            <h1>Privacy Policy</h1>
+            <p><strong>Effective Date:</strong> July 7, 2026</p>
+            <p>Promptimizer is designed with a strict privacy-first architecture. This Privacy Policy details how we handle user data, API keys, and third-party integrations (including Cloudflare Turnstile).</p>
+
+            <h2>1. Core Architecture &amp; Data Control</h2>
+            <p>Promptimizer is a client-side heavy application.</p>
+            <ul>
+              <li><strong>Local Storage:</strong> All user configurations, API keys, prompt histories, and saved library items are stored directly within your web browser's local storage (<code>localStorage</code>). This data is sandboxed to your browser and is never stored on our servers.</li>
+              <li><strong>No Database:</strong> We do not operate a backend database to store user credentials, keys, or prompt content.</li>
+            </ul>
+
+            <h2>2. API Key &amp; Prompt Transmission</h2>
+            <p>When you optimize or critique a prompt:</p>
+            <ol>
+              <li><strong>Stateless Proxying:</strong> The application transmits the API key and prompt text via our Cloudflare Pages Functions to act as a stateless proxy to the designated AI provider (e.g., OpenAI, Anthropic, Google, OpenRouter, or NVIDIA NIM).</li>
+              <li><strong>No Data Logging:</strong> The Cloudflare Pages Functions do not log, cache, or store your API keys or prompt contents. The data is processed in-memory and passed directly to the AI provider.</li>
+              <li><strong>Direct Transit:</strong> If you configure a custom Base URL in the settings, your browser may send requests directly to that endpoint (subject to the CORS configuration of that endpoint).</li>
+            </ol>
+
+            <h2>3. Third-Party Services &amp; Integrations</h2>
+            <h3>AI Model Providers</h3>
+            <p>Your prompts, variables, and API keys are sent to the AI provider you select (e.g., OpenAI, Anthropic, Google AI Studio, OpenRouter, or NVIDIA). The handling of that data is governed by the respective privacy policies and terms of service of those providers.</p>
+
+            <h3>Cloudflare Turnstile (Security &amp; Anti-Abuse)</h3>
+            <p>To protect our platform against automated abuse, spam, and denial-of-service attacks, we use <strong>Cloudflare Turnstile</strong> in <strong>Invisible Mode</strong> (silently validating requests without active visual challenges).</p>
+            <p>As a condition of using Turnstile's invisible verification mode, we reference and incorporate Cloudflare's disclosures:</p>
+            <ul>
+              <li>Turnstile collects and processes telemetry, browser characteristics, and user interaction data to verify that visitor requests are legitimate.</li>
+              <li>This processing is governed by the <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" style="color: var(--accent); text-decoration: underline;">Cloudflare Turnstile Privacy Addendum</a> and the main <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" style="color: var(--accent); text-decoration: underline;">Cloudflare Privacy Policy</a>.</li>
+              <li>No personal identification information is collected by this application through Turnstile.</li>
+            </ul>
+
+            <h2>4. User Choices &amp; Control</h2>
+            <p>You have full control over your data:</p>
+            <ul>
+              <li><strong>Clear Data:</strong> You can delete all stored API keys, history, and preferences at any time by clicking "Clear Saved Keys" or similar reset options in the API Settings panel, or by clearing your browser's site data/cache for this origin.</li>
+              <li><strong>Hosted Keys vs. Bring Your Own Key:</strong> If you choose not to enter a personal API key, you may use shared hosted keys (if available), which keeps all API authentication secret server-side.</li>
+            </ul>
+
+            <h2>5. Contact &amp; Open Source</h2>
+            <p>Promptimizer is an open-source project. You can inspect the source code, trace data flows, or file issues directly on our <a href="https://github.com/OptiLabResearch/prompt-optimizer" target="_blank" style="color: var(--accent); text-decoration: underline;">GitHub Repository</a>.</p>
+          </div>
         </div>
       </div>
       <div class="modal-footer" style="border-top: 1px solid var(--border); padding: 12px 18px;">
@@ -2759,6 +2804,7 @@
         <button class="mobile-menu-item" id="mobileHistoryBtn">↺ History</button>
         <button class="mobile-menu-item" id="mobileApiBtn">⚙ API Settings</button>
         <button class="mobile-menu-item" id="mobileThemeToggleBtn">◐ Toggle Theme</button>
+        <button class="mobile-menu-item" id="mobilePrivacyBtn">🔒 Privacy Policy</button>
         <hr class="mobile-menu-divider">
         <a class="mobile-menu-item" id="mobileGithubLink" href="https://github.com/OptiLabResearch/promptimizer" target="_blank" rel="noopener">🐙 GitHub</a>
         <a class="mobile-menu-item" id="mobileRoadmapLink" href="https://github.com/users/OptiLabResearch/projects/1/views/1" target="_blank" rel="noopener">🗺 Roadmap</a>
@@ -5396,6 +5442,7 @@
       var footerMethodology = document.getElementById('footerMethodology');
       var footerFeatures = document.getElementById('footerFeatures');
       var footerWhyThisExists = document.getElementById('footerWhyThisExists');
+      var footerPrivacy = document.getElementById('footerPrivacy');
 
       function openGuideTab(tabId) {
         openGuide();
@@ -5425,6 +5472,12 @@
         footerWhyThisExists.addEventListener('click', function(e) {
           e.preventDefault();
           openGuideTab('why');
+        });
+      }
+      if (footerPrivacy) {
+        footerPrivacy.addEventListener('click', function(e) {
+          e.preventDefault();
+          openGuideTab('privacy');
         });
       }
 
@@ -5825,6 +5878,7 @@
       var mobileHistoryBtn = document.getElementById('mobileHistoryBtn');
       var mobileApiBtn = document.getElementById('mobileApiBtn');
       var mobileThemeToggleBtn = document.getElementById('mobileThemeToggleBtn');
+      var mobilePrivacyBtn = document.getElementById('mobilePrivacyBtn');
       var mobileGithubLink = document.getElementById('mobileGithubLink');
       var mobileRoadmapLink = document.getElementById('mobileRoadmapLink');
       var mobileFeedbackBtn = document.getElementById('mobileFeedbackBtn');
@@ -5870,6 +5924,12 @@
         mobileFeedbackBtn.addEventListener('click', function () {
           closeMobileMenu();
           if (typeof openFeedbackModal === 'function') openFeedbackModal();
+        });
+      }
+      if (mobilePrivacyBtn) {
+        mobilePrivacyBtn.addEventListener('click', function () {
+          closeMobileMenu();
+          if (typeof openGuideTab === 'function') openGuideTab('privacy');
         });
       }
 
