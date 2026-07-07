@@ -3,7 +3,7 @@ const assert = {
     if (!val) throw new Error(message || "Assertion failed");
   }
 };
-import { ValidationError, RateLimitError, resolveProviderConfig, callCompletion, buildOptimizePrompt, buildRefinePassPrompt, parseDelimitedResponse, iterSseEvents, enforceHostedRateLimit } from "../../_lib/optimizer.js";
+import { ValidationError, RateLimitError, resolveProviderConfig, callCompletion, buildOptimizePrompt, buildRefinePassPrompt, parseDelimitedResponse, iterSseEvents, enforceHostedRateLimit, prepareRequest } from "../../_lib/optimizer.js";
 
 function makeMockStream(chunks) {
   let index = 0;
@@ -138,6 +138,10 @@ export async function runUnitTests() {
       "http://metadata.google.internal/v1",
       "http://[::1]/v1",
       "ftp://example.com/v1",
+      "http://2130706433/v1",
+      "http://0177.0.0.1/v1",
+      "http://0x7f000001/v1",
+      "http://[::ffff:7f00:1]/v1",
     ];
     for (const base_url of unsafeUrls) {
       let errorMsg = "";
@@ -180,6 +184,37 @@ export async function runUnitTests() {
     }
     assert.ok(results.length === 2, "Should yield 2 events, including the last one without trailing newlines");
     assert.ok(results[1] === '{"piece": 6}', "Last event data should be yielded correctly");
+  });
+
+  await runTest("prepareRequest maps OpenAI multimodal images to Anthropic image blocks", () => {
+    const attempt = { mode: "anthropic", baseUrl: "https://api.anthropic.com", apiKey: "key", model: "claude-haiku-4-5" };
+    const userText = [
+      { type: "text", text: "What is this image?" },
+      { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" } }
+    ];
+    const req = prepareRequest(attempt, "system prompt", userText, 1000);
+    const content = req.body.messages[0].content;
+    assert.ok(Array.isArray(content), "Content should be an array");
+    assert.ok(content[0].type === "text" && content[0].text === "What is this image?", "First element should be text");
+    assert.ok(content[1].type === "image", "Second element should be type image");
+    assert.ok(content[1].source.type === "base64", "Source type should be base64");
+    assert.ok(content[1].source.media_type === "image/png", "Source media_type should be image/png");
+    assert.ok(content[1].source.data === "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "Source data should match the base64 part");
+  });
+
+  await runTest("prepareRequest rejects unsupported HEIC/HEIF images for Anthropic", () => {
+    const attempt = { mode: "anthropic", baseUrl: "https://api.anthropic.com", apiKey: "key", model: "claude-haiku-4-5" };
+    const userText = [
+      { type: "text", text: "What is this image?" },
+      { type: "image_url", image_url: { url: "data:image/heic;base64,AAAAAAA=" } }
+    ];
+    let threw = false;
+    try {
+      prepareRequest(attempt, "system prompt", userText, 1000);
+    } catch (e) {
+      if (e instanceof ValidationError && e.message.includes("HEIC/HEIF")) threw = true;
+    }
+    assert.ok(threw, "Should throw ValidationError on HEIC/HEIF for Anthropic");
   });
 
   return results;

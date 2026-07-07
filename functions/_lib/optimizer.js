@@ -464,7 +464,6 @@ export function parseDelimitedResponse(rawResponse) {
   return { optimizedText, explanationText };
 }
 
-const CIRCUIT_CACHE_KEY = "https://prompt-optimizer.local/circuit-breaker-state";
 const localMemoryCache = new Map();
 
 // Short, non-reversible-in-practice tag distinguishing which pooled key an
@@ -472,6 +471,14 @@ const localMemoryCache = new Map();
 // (provider, model) pair when other keys in the pool are still healthy.
 function keyFingerprint(key) {
   return key ? key.slice(-6) : "nokey";
+}
+
+// Each (provider, model, key) mute lives under its own cache URL rather than
+// a single shared JSON blob — otherwise every mute's Cache-Control: max-age
+// would overwrite the whole blob's TTL, letting a later short mute (e.g. 10m
+// for a timeout) truncate an earlier long one (e.g. 24h for a bad key).
+function circuitCacheUrl(provider, model, keyTag) {
+  return `https://prompt-optimizer.local/circuit/${encodeURIComponent(provider)}/${encodeURIComponent(model)}/${encodeURIComponent(keyTag)}`;
 }
 
 async function getCircuitStatus(provider, model, keyTag) {
@@ -486,13 +493,10 @@ async function getCircuitStatus(provider, model, keyTag) {
   try {
     if (typeof caches !== "undefined" && caches.default) {
       const cache = caches.default;
-      const response = await cache.match(new Request(CIRCUIT_CACHE_KEY));
-      if (response) {
-        const data = await response.json();
-        if (data[cacheKey] && Date.now() < data[cacheKey]) {
-          return true;
-        }
-      }
+      const response = await cache.match(new Request(circuitCacheUrl(provider, model, keyTag)));
+      // Presence alone means still muted; the Cache API expires the entry
+      // itself once Cache-Control: max-age elapses.
+      if (response) return true;
     }
   } catch (e) {}
   return false;
@@ -501,27 +505,15 @@ async function getCircuitStatus(provider, model, keyTag) {
 async function muteModelInCircuit(provider, model, durationSeconds, keyTag) {
   const cacheKey = `${provider}:${model}:${keyTag}`;
   const expiresAt = Date.now() + (durationSeconds * 1000);
-  
+
   localMemoryCache.set(cacheKey, expiresAt);
 
   try {
     if (typeof caches !== "undefined" && caches.default) {
       const cache = caches.default;
-      let state = {};
-      const req = new Request(CIRCUIT_CACHE_KEY);
-      const existing = await cache.match(req);
-      if (existing) {
-        try {
-          state = await existing.json();
-        } catch (err) {}
-      }
-      state[cacheKey] = expiresAt;
-
-      const response = new Response(JSON.stringify(state), {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": `max-age=${durationSeconds}`,
-        }
+      const req = new Request(circuitCacheUrl(provider, model, keyTag));
+      const response = new Response("1", {
+        headers: { "Cache-Control": `max-age=${durationSeconds}` },
       });
       await cache.put(req, response);
     }
@@ -552,10 +544,13 @@ async function fetchActiveModelsForProvider(provider, baseUrl, apiKey) {
     
     const controller = new AbortController();
     const tId = setTimeout(() => controller.abort(), 5000);
-    
-    const resp = await fetch(url, { headers, signal: controller.signal });
-    clearTimeout(tId);
-    
+    let resp;
+    try {
+      resp = await fetch(url, { headers, signal: controller.signal });
+    } finally {
+      clearTimeout(tId);
+    }
+
     if (resp.ok) {
       const result = await resp.json();
       if (result) {
@@ -584,18 +579,18 @@ async function fetchActiveModelsForProvider(provider, baseUrl, apiKey) {
   return null;
 }
 
-function resolveKey(provider, env) {
+function getKeyPool(provider, env) {
   const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-  const rawKey = env[`${cleanProviderName}_API_KEY`] || 
-                 env[`${cleanProviderName}_KEY`] ||
-                 (provider === "nvidia" ? env.NVIDIA_API_KEY :
-                  provider === "openrouter" ? env.OPENROUTER_API_KEY :
-                  provider === "google" ? env.GOOGLE_API_KEY : undefined);
-
-  if (!rawKey) return null;
+  const rawKey = env[`${cleanProviderName}_API_KEY`] ||
+                 env[`${cleanProviderName}_KEY`];
+  if (!rawKey) return [];
 
   // Split by comma in case of key pooling (e.g. key1,key2,key3)
-  const keys = rawKey.split(",").map(k => k.trim()).filter(Boolean);
+  return rawKey.split(",").map(k => k.trim()).filter(Boolean);
+}
+
+function resolveKey(provider, env) {
+  const keys = getKeyPool(provider, env);
   if (keys.length === 0) return null;
 
   // Pick a random key from the pool
@@ -603,9 +598,106 @@ function resolveKey(provider, env) {
   return keys[randomIndex];
 }
 
+// Parsers and helpers to check if a hostname resolves to loopback, private,
+// link-local, or reserved IP ranges.
+function parseIPv4(hostname) {
+  const s = hostname.trim();
+  const parts = s.split('.');
+  if (parts.length < 1 || parts.length > 4) {
+    return null;
+  }
+  
+  const values = [];
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part === "") return null;
+    
+    let val;
+    if (part.toLowerCase().startsWith("0x")) {
+      val = parseInt(part, 16);
+      if (isNaN(val)) return null;
+    } else if (part.startsWith("0") && part.length > 1) {
+      if (!/^[0-7]+$/.test(part)) {
+        return null;
+      }
+      val = parseInt(part, 8);
+      if (isNaN(val)) return null;
+    } else {
+      if (!/^\d+$/.test(part)) {
+        return null;
+      }
+      val = parseInt(part, 10);
+      if (isNaN(val)) return null;
+    }
+    values.push(val);
+  }
+  
+  for (let i = 0; i < values.length - 1; i++) {
+    if (values[i] > 255) return null;
+  }
+  const lastVal = values[values.length - 1];
+  if (parts.length === 1) {
+    if (lastVal > 4294967295) return null;
+  } else if (parts.length === 2) {
+    if (lastVal > 16777215) return null;
+  } else if (parts.length === 3) {
+    if (lastVal > 65535) return null;
+  } else if (parts.length === 4) {
+    if (lastVal > 255) return null;
+  }
+  
+  let ipInt = 0;
+  if (parts.length === 1) {
+    ipInt = values[0];
+  } else if (parts.length === 2) {
+    ipInt = values[0] * 16777216 + values[1];
+  } else if (parts.length === 3) {
+    ipInt = values[0] * 16777216 + values[1] * 65536 + values[2];
+  } else if (parts.length === 4) {
+    ipInt = values[0] * 16777216 + values[1] * 65536 + values[2] * 256 + values[3];
+  }
+  return ipInt;
+}
+
+function isPrivateOrReservedIPv4(ipInt) {
+  if (ipInt === null) return false;
+  // 0.0.0.0/8
+  if (ipInt >= 0 && ipInt <= 16777215) return true;
+  // 10.0.0.0/8
+  if (ipInt >= 167772160 && ipInt <= 184549375) return true;
+  // 100.64.0.0/10
+  if (ipInt >= 1681915904 && ipInt <= 1686110207) return true;
+  // 127.0.0.0/8
+  if (ipInt >= 2130706432 && ipInt <= 2147483647) return true;
+  // 169.254.0.0/16
+  if (ipInt >= 2851995648 && ipInt <= 2852061183) return true;
+  // 172.16.0.0/12
+  if (ipInt >= 2886729728 && ipInt <= 2887778303) return true;
+  // 192.0.0.0/24
+  if (ipInt >= 3221225472 && ipInt <= 3221225727) return true;
+  // 192.0.2.0/24
+  if (ipInt >= 3221225984 && ipInt <= 3221226239) return true;
+  // 192.88.99.0/24
+  if (ipInt >= 3225114368 && ipInt <= 3225114623) return true;
+  // 192.168.0.0/16
+  if (ipInt >= 3232235520 && ipInt <= 3232301055) return true;
+  // 198.18.0.0/15
+  if (ipInt >= 3323068416 && ipInt <= 3323199487) return true;
+  // 198.51.100.0/24
+  if (ipInt >= 3325256704 && ipInt <= 3325256959) return true;
+  // 203.0.113.0/24
+  if (ipInt >= 3405803776 && ipInt <= 3405804031) return true;
+  // 224.0.0.0/4 (Multicast)
+  if (ipInt >= 3758096384 && ipInt <= 3925868543) return true;
+  // 240.0.0.0/4 (Reserved/Experimental)
+  if (ipInt >= 4026531840 && ipInt <= 4294967295) return true;
+  
+  return false;
+}
+
 // Hosts a custom base_url must never resolve to: loopback, link-local
 // (including the cloud metadata address), and RFC1918 private ranges. This
-// blocks the obvious SSRF/open-relay vectors while still allowing any public
+// blocks SSRF/open-relay vectors while still allowing any public
 // OpenAI-compatible API endpoint a user wants to point their own key at.
 function assertSafeBaseUrl(rawUrl) {
   let parsed;
@@ -618,26 +710,65 @@ function assertSafeBaseUrl(rawUrl) {
     throw new ValidationError("Base URL must use http or https.");
   }
 
-  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  let hostname = parsed.hostname.toLowerCase();
+  let isIPv6 = false;
+  if (hostname.startsWith("[") && hostname.endsWith("]")) {
+    hostname = hostname.slice(1, -1);
+    isIPv6 = true;
+  } else if (hostname.includes(":")) {
+    isIPv6 = true;
+  }
+
   if (hostname === "localhost" || hostname === "metadata.google.internal") {
     throw new ValidationError("Base URL may not point at a local or metadata address.");
   }
 
-  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    const isPrivate =
-      a === 127 || // loopback
-      a === 10 || // 10.0.0.0/8
-      (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
-      (a === 192 && b === 168) || // 192.168.0.0/16
-      (a === 169 && b === 254) || // 169.254.0.0/16 (includes cloud metadata)
-      a === 0;
-    if (isPrivate) {
+  const ipv4Int = parseIPv4(hostname);
+  if (ipv4Int !== null) {
+    if (isPrivateOrReservedIPv4(ipv4Int)) {
       throw new ValidationError("Base URL may not point at a private or link-local address.");
     }
-  } else if (hostname === "::1" || hostname.startsWith("fe80:") || hostname.startsWith("fc") || hostname.startsWith("fd")) {
-    throw new ValidationError("Base URL may not point at a private or link-local address.");
+    return;
+  }
+
+  if (isIPv6) {
+    if (hostname === "::1" || hostname === "::" || hostname === "0:0:0:0:0:0:0:1" || hostname === "0:0:0:0:0:0:0:0") {
+      throw new ValidationError("Base URL may not point at a private or link-local address.");
+    }
+    if (hostname.startsWith("fe80:") || hostname.startsWith("fe9") || hostname.startsWith("fea") || hostname.startsWith("feb")) {
+      throw new ValidationError("Base URL may not point at a private or link-local address.");
+    }
+    if (hostname.startsWith("fc") || hostname.startsWith("fd")) {
+      throw new ValidationError("Base URL may not point at a private or link-local address.");
+    }
+    if (hostname.startsWith("::ffff:") || hostname.startsWith("0:0:0:0:0:ffff:")) {
+      let ipv4Part = "";
+      if (hostname.startsWith("::ffff:")) {
+        ipv4Part = hostname.slice(7);
+      } else {
+        ipv4Part = hostname.slice(15);
+      }
+      
+      let mappedIpInt = null;
+      if (ipv4Part.includes(".")) {
+        mappedIpInt = parseIPv4(ipv4Part);
+      } else if (ipv4Part.includes(":")) {
+        const hexParts = ipv4Part.split(":");
+        if (hexParts.length === 2) {
+          const high = parseInt(hexParts[0], 16);
+          const low = parseInt(hexParts[1], 16);
+          if (!isNaN(high) && !isNaN(low)) {
+            mappedIpInt = high * 65536 + low;
+          }
+        }
+      } else {
+        mappedIpInt = parseIPv4(ipv4Part);
+      }
+      
+      if (mappedIpInt !== null && isPrivateOrReservedIPv4(mappedIpInt)) {
+        throw new ValidationError("Base URL may not point at a private or link-local address.");
+      }
+    }
   }
 }
 
@@ -700,16 +831,15 @@ export async function resolveProviderConfig(body, env) {
   }
 
   const attempts = [];
-  sharedProviders.forEach((provider, i) => {
+  for (let i = 0; i < sharedProviders.length; i++) {
+    const provider = sharedProviders[i];
     const preset = PROVIDER_PRESETS[provider];
-    if (!preset) return;
+    if (!preset) continue;
 
     const cleanProviderName = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-    // Bail out early if the provider has no key configured at all, but
-    // otherwise resolve a (possibly pooled) key per model below, so a
-    // rate-limited/bad key on one model attempt doesn't force every other
-    // fallback model for this provider to reuse the same unlucky pick.
-    if (!resolveKey(provider, env)) return;
+    const keyPool = getKeyPool(provider, env);
+    // Bail out early if the provider has no key configured at all.
+    if (keyPool.length === 0) continue;
 
     const rawModels = env[`HOSTED_MODEL_${cleanProviderName}`] || (i === 0 ? env.HOSTED_MODEL : "");
     const models = String(rawModels || "")
@@ -727,12 +857,23 @@ export async function resolveProviderConfig(body, env) {
       if (catalogs[provider] && !catalogs[provider].includes(model)) {
         continue;
       }
-      const key = resolveKey(provider, env);
+      // Prefer a key from the pool that isn't currently muted by the circuit
+      // breaker, so one bad/rate-limited key in the pool doesn't drop the
+      // whole (provider, model) attempt while sibling keys are still healthy.
+      const healthyKeys = [];
+      for (const candidateKey of keyPool) {
+        if (!(await getCircuitStatus(provider, model, keyFingerprint(candidateKey)))) {
+          healthyKeys.push(candidateKey);
+        }
+      }
+      const effectivePool = healthyKeys.length > 0 ? healthyKeys : keyPool;
+      const key = effectivePool[Math.floor(Math.random() * effectivePool.length)];
       attempts.push({ mode: preset.mode, baseUrl: preset.baseUrl, apiKey: key, model, provider });
     }
-  });
+  }
 
-  // Filter out any attempts that are currently muted in the circuit breaker
+  // Filter out any attempts that are still muted (only possible when every
+  // key in a pool was muted and the loop above had to fall back to one anyway).
   let activeAttempts = [];
   for (const attempt of attempts) {
     if (!(await getCircuitStatus(attempt.provider, attempt.model, keyFingerprint(attempt.apiKey)))) {
@@ -753,8 +894,31 @@ export async function resolveProviderConfig(body, env) {
 }
 
 // Request preparation factory helper (DRY)
-function prepareRequest(attempt, systemPrompt, userText, maxTokens, stream = false) {
+export function prepareRequest(attempt, systemPrompt, userText, maxTokens, stream = false) {
   if (attempt.mode === "anthropic") {
+    let content = userText;
+    if (Array.isArray(userText)) {
+      content = userText.map((part) => {
+        if (part && part.type === "image_url" && part.image_url && typeof part.image_url.url === "string") {
+          const match = /^data:([^;]+);base64,(.+)$/s.exec(part.image_url.url);
+          if (match) {
+            const mediaType = match[1].toLowerCase();
+            if (mediaType === "image/heic" || mediaType === "image/heif") {
+              throw new ValidationError("Anthropic does not support HEIC/HEIF images. Please upload PNG, JPEG, or WEBP.");
+            }
+            return {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mediaType,
+                data: match[2],
+              },
+            };
+          }
+        }
+        return part;
+      });
+    }
     return {
       url: `${attempt.baseUrl.replace(/\/$/, "")}/v1/messages`,
       headers: {
@@ -765,7 +929,7 @@ function prepareRequest(attempt, systemPrompt, userText, maxTokens, stream = fal
       body: {
         model: attempt.model,
         ...(systemPrompt ? { system: systemPrompt } : {}),
-        messages: [{ role: "user", content: userText }],
+        messages: [{ role: "user", content }],
         max_tokens: maxTokens,
         ...(stream ? { stream: true } : {}),
       },
@@ -928,7 +1092,7 @@ export async function streamCompletion(config, systemPrompt, userText, maxTokens
         continue;
       }
 
-      if (data.usage) {
+      if (data.usage && attempt.mode !== "anthropic") {
         usage = data.usage;
       }
 

@@ -229,7 +229,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 22px;
-    max-width: 100%;
+    max-width: 1600px;
     width: 100%;
     margin: 0 auto;
     padding: 20px 28px;
@@ -1755,8 +1755,16 @@
     font-weight: 500;
     cursor: pointer;
     text-align: left;
+    text-decoration: none;
     width: 100%;
+    box-sizing: border-box;
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .mobile-menu-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
   }
 
   .mobile-menu-item:hover {
@@ -1824,6 +1832,11 @@
       align-items: flex-start;
       padding: 16px 20px;
       gap: 12px;
+    }
+    /* Guide/GitHub/Roadmap/feedback are all reachable from the hamburger
+       menu on mobile, so drop the duplicate footer link row there. */
+    .footer-links {
+      display: none;
     }
     .bench-panel { width: 100%; }
   }
@@ -2714,6 +2727,10 @@
         <button class="mobile-menu-item" id="mobileHistoryBtn">↺ History</button>
         <button class="mobile-menu-item" id="mobileApiBtn">⚙ API Settings</button>
         <button class="mobile-menu-item" id="mobileThemeToggleBtn">◐ Toggle Theme</button>
+        <hr class="mobile-menu-divider">
+        <a class="mobile-menu-item" id="mobileGithubLink" href="https://github.com/OptiLabResearch/prompt-optimizer" target="_blank" rel="noopener">🐙 GitHub</a>
+        <a class="mobile-menu-item" id="mobileRoadmapLink" href="https://github.com/users/OptiLabResearch/projects/1/views/1" target="_blank" rel="noopener">🗺 Roadmap</a>
+        <button class="mobile-menu-item" id="mobileFeedbackBtn">💬 Give feedback</button>
       </nav>
     </div>
   </div>
@@ -2721,6 +2738,11 @@
 
   <script>
     (function () {
+      // Forking this project? Point this at your own Formspree endpoint (or
+      // any endpoint accepting {message, email} JSON) so feedback goes to
+      // you instead of the original deployment's inbox.
+      var FEEDBACK_FORM_URL = 'https://formspree.io/f/mpqgbonn';
+
       var THEME_KEY = 'promptOptimizerTheme';
       var saved = localStorage.getItem(THEME_KEY);
       if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
@@ -5049,7 +5071,7 @@
         feedbackSend.disabled = true;
         feedbackSend.textContent = 'Sending…';
 
-        fetch('https://formspree.io/f/mpqgbonn', {
+        fetch(FEEDBACK_FORM_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -5550,6 +5572,9 @@
       var mobileHistoryBtn = document.getElementById('mobileHistoryBtn');
       var mobileApiBtn = document.getElementById('mobileApiBtn');
       var mobileThemeToggleBtn = document.getElementById('mobileThemeToggleBtn');
+      var mobileGithubLink = document.getElementById('mobileGithubLink');
+      var mobileRoadmapLink = document.getElementById('mobileRoadmapLink');
+      var mobileFeedbackBtn = document.getElementById('mobileFeedbackBtn');
 
       if (mobileGuideBtn) {
         mobileGuideBtn.addEventListener('click', function () {
@@ -5580,6 +5605,18 @@
           closeMobileMenu();
           var desktopThemeToggle = document.getElementById('themeToggle');
           if (desktopThemeToggle) desktopThemeToggle.click();
+        });
+      }
+      if (mobileGithubLink) {
+        mobileGithubLink.addEventListener('click', function () { closeMobileMenu(); });
+      }
+      if (mobileRoadmapLink) {
+        mobileRoadmapLink.addEventListener('click', function () { closeMobileMenu(); });
+      }
+      if (mobileFeedbackBtn) {
+        mobileFeedbackBtn.addEventListener('click', function () {
+          closeMobileMenu();
+          if (typeof openFeedbackModal === 'function') openFeedbackModal();
         });
       }
 
