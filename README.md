@@ -1,6 +1,6 @@
 # Prompt Optimizer
 
-Live website: [https://promptoptimizer.optiqo.dev/](https://promptoptimizer.optiqo.dev/)
+Live website: [https://promptoptimizer.optiqo.dev/](https://promptoptimizer.optiqo.dev/) · [📋 Public Roadmap](https://github.com/users/OptiLabResearch/projects/1/views/1)
 
 Paste a rough prompt, get back a structured, model-tailored rewrite — with chain-of-thought, few-shot, and XML technique toggles, per-target-model guidance (Claude, GPT, Gemini, or local), iterative refinement, a word-diff view, and a before/after test run against the raw vs. optimized prompt.
 
