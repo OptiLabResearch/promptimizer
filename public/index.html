@@ -3187,6 +3187,40 @@
         }
       }
 
+      function getPromptSummary(text) {
+        if (!text) return 'Empty Prompt';
+        var cleanText = text.replace(/<\/?[^>]+(>|$)/g, "")
+                            .replace(/[#*`_\[\]()]+/g, " ")
+                            .replace(/\s+/g, " ")
+                            .trim();
+        if (!cleanText) return 'Prompt';
+        
+        var words = cleanText.split(' ');
+        var stopWords = ['a', 'an', 'the', 'write', 'create', 'please', 'to', 'for', 'in', 'of', 'and', 'or', 'is', 'it', 'with', 'me', 'you', 'i', 'generate', 'make', 'give', 'help', 'design', 'show', 'explain', 'draft'];
+        var filteredWords = [];
+        for (var i = 0; i < words.length; i++) {
+          var w = words[i].toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (w && stopWords.indexOf(w) === -1) {
+            filteredWords.push(words[i]);
+          }
+        }
+        
+        var displayWords = filteredWords.length > 0 ? filteredWords : words;
+        var summaryWords = displayWords.slice(0, 3);
+        
+        summaryWords = summaryWords.map(function(w) {
+          var cleanW = w.replace(/[^a-zA-Z0-9]$/, '');
+          if (!cleanW) return w;
+          return cleanW.charAt(0).toUpperCase() + cleanW.slice(1);
+        });
+        
+        var summary = summaryWords.join(' ');
+        if (words.length > 3) {
+          summary += '...';
+        }
+        return summary;
+      }
+
       function recordHistory(promptText, options, result) {
         if (!promptText || !promptText.trim()) return;
         var list = readList(HISTORY_KEY);
@@ -3952,7 +3986,7 @@
           
           var strength = document.createElement('span');
           strength.className = 'lib-item-name';
-          strength.textContent = (item.options && item.options.style) || 'balanced';
+          strength.textContent = getPromptSummary(item.input);
           strength.style.borderBottom = 'none';
           strength.style.cursor = 'default';
 
@@ -3963,6 +3997,66 @@
           header.appendChild(strength);
           header.appendChild(dateSpan);
           el.appendChild(header);
+
+          // Add metadata tags row if options are present
+          if (item.options || (item.result && item.result.model)) {
+            var metaRow = document.createElement('div');
+            metaRow.style.display = 'flex';
+            metaRow.style.flexWrap = 'wrap';
+            metaRow.style.gap = '4px';
+            metaRow.style.margin = '4px 0 8px 0';
+            metaRow.style.alignItems = 'center';
+
+            // 1. Model used
+            var modelName = (item.result && item.result.model) || (item.options && item.options.target);
+            if (modelName) {
+              var modelTag = document.createElement('span');
+              modelTag.className = 'chip-tag';
+              modelTag.style.background = 'var(--accent-tint, #f5f3ff)';
+              modelTag.style.color = 'var(--accent-deep, #6d28d9)';
+              modelTag.style.fontWeight = '500';
+              
+              var displayModel = modelName;
+              if (displayModel.indexOf('/') !== -1) {
+                displayModel = displayModel.split('/').pop();
+              }
+              modelTag.textContent = '🤖 ' + displayModel;
+              metaRow.appendChild(modelTag);
+            }
+
+            // 2. Style (strength)
+            if (item.options && item.options.style) {
+              var styleTag = document.createElement('span');
+              styleTag.className = 'chip-tag';
+              styleTag.textContent = 'Style: ' + item.options.style;
+              metaRow.appendChild(styleTag);
+            }
+
+            // 3. Quality (depth)
+            if (item.options && item.options.quality) {
+              var depthTag = document.createElement('span');
+              depthTag.className = 'chip-tag';
+              depthTag.textContent = 'Depth: ' + item.options.quality;
+              metaRow.appendChild(depthTag);
+            }
+
+            // 4. Techniques
+            if (item.options && Array.isArray(item.options.techniques) && item.options.techniques.length > 0) {
+              var techNames = item.options.techniques.map(function(t) {
+                if (t === 'fewshot' || t === 'few-shot') return 'Few-shot';
+                if (t === 'cot') return 'CoT';
+                if (t === 'xml') return 'XML';
+                if (t === 'placeholders') return 'Vars';
+                return t;
+              });
+              var techTag = document.createElement('span');
+              techTag.className = 'chip-tag';
+              techTag.textContent = 'Tech: ' + techNames.join(', ');
+              metaRow.appendChild(techTag);
+            }
+
+            el.appendChild(metaRow);
+          }
 
           var snippet = document.createElement('div');
           snippet.className = 'history-item-snippet mono';
