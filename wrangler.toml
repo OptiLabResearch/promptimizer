@@ -36,6 +36,7 @@ compatibility_date = "2024-09-23"
 [vars]
 # Provider order: Groq first (best speed), Google second, NVIDIA NIM third, OpenRouter last.
 HOSTED_PROVIDER = "groq,google,nvidia,openrouter"
+TURNSTILE_SITE_KEY = "0x4AAAAAABtUlW0KAQy1Nnoz"
 
 # Groq — GPT-OSS 120B first: much less terse than Llama 3.3 70B at similar
 # speed; Llama models kept as fallbacks if GPT-OSS is unavailable.
