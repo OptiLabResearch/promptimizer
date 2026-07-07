@@ -1,3 +1,22 @@
+function safeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export async function onRequestGet({ request, env }) {
   const acceptHeader = request.headers.get("accept") || "";
   const wantHtml = acceptHeader.includes("text/html");
@@ -10,7 +29,7 @@ export async function onRequestGet({ request, env }) {
   const expectedToken = env.STATS_TOKEN;
   const isTokenConfigured = typeof expectedToken === 'string' && expectedToken.trim() !== '';
 
-  if (isTokenConfigured && providedToken !== expectedToken) {
+  if (!isTokenConfigured || !safeCompare(providedToken, expectedToken)) {
     if (wantHtml) {
       return new Response(
         `<!DOCTYPE html>
@@ -253,8 +272,8 @@ function renderConfigErrorHtml(missingMsg, qEvents, qTimes, qReturnRate) {
           <h1>⚙️ Configuration Required</h1>
           <p>To pull live metrics, you must set these environment variables/secrets in the Cloudflare dashboard or <code>.dev.vars</code>:</p>
           <p>1. <code>CLOUDFLARE_API_TOKEN</code> (with Account Analytics Read permission)</p>
-          <p>2. <code>CLOUDFLARE_ACCOUNT_ID</code> (e.g. <code>14df474ff0c537e534c38492484b20be</code>)</p>
-          <p>Missing parameters: <strong>${missingMsg}</strong></p>
+          <p>2. <code>CLOUDFLARE_ACCOUNT_ID</code> (e.g. <code>&lt;your-account-id&gt;</code>)</p>
+          <p>Missing parameters: <strong>${escapeHtml(missingMsg)}</strong></p>
         </div>
 
         <div class="card sql-section">
@@ -311,7 +330,7 @@ function renderErrorHtml(errorMsg, qEvents, qTimes, qReturnRate) {
         <div class="card">
           <h1>${errorTitle}</h1>
           <p>${errorDesc}</p>
-          <pre>${errorMsg}</pre>
+          <pre>${escapeHtml(errorMsg)}</pre>
           ${isAuthError ? `<p style="margin-top: 1.5rem;"><a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" class="btn">Go to Cloudflare Tokens Dashboard &rarr;</a></p>` : ''}
         </div>
 
@@ -341,7 +360,7 @@ function renderErrorHtml(errorMsg, qEvents, qTimes, qReturnRate) {
 function renderHtmlDashboard(metrics, showPublicWarning, token) {
   const m = metrics.success_metrics;
   const counts = metrics.counts;
-  const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
+  const tokenQuery = '';
 
   const formatPct = (val) => typeof val === 'number' ? `${val.toFixed(1)}%` : '0.0%';
   const formatSec = (val) => typeof val === 'number' ? `${val.toFixed(2)}s` : 'N/A';
@@ -671,7 +690,7 @@ function renderHtmlDashboard(metrics, showPublicWarning, token) {
               <p style="margin-top:0;">This dashboard aggregates telemetry logs from a serverless Cloudflare Workers Analytics Engine dataset.</p>
               <p>To fetch the raw structured payload directly, query the JSON API endpoint:</p>
               <p><a class="api-link" href="/api/stats${tokenQuery}">GET /api/stats (JSON)</a></p>
-              <p><strong>Privacy Architecture:</strong> No persistent cookies or storage are used except for random UUIDs in LocalStorage/SessionStorage. IP addresses are completely discarded. Zero third-party scripts loaded.</p>
+              <p><strong>Privacy Architecture:</strong> No persistent cookies or storage are used except for random UUIDs in LocalStorage/SessionStorage. IP addresses are completely discarded. Third-party scripts are limited to Cloudflare Turnstile (bot protection) and Google Fonts on this dashboard.</p>
             </div>
           </div>
         </div>

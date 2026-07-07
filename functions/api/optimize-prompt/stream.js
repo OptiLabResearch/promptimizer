@@ -6,6 +6,7 @@ import {
   resolveProviderConfig,
   streamCompletion,
   enforceHostedRateLimit,
+  enforceByokRateLimit,
   validateImage,
   buildUserContent,
   verifyTurnstileToken,
@@ -33,6 +34,8 @@ export async function onRequestPost({ request, env }) {
     if (!String(body.api_key || "").trim()) {
       await verifyTurnstileToken(body, request, env);
       await enforceHostedRateLimit(env, request);
+    } else {
+      await enforceByokRateLimit(env, request);
     }
     ({ systemPrompt, userText } = buildOptimizePrompt(body, rawPrompt));
     if (body.image) {
@@ -52,12 +55,18 @@ export async function onRequestPost({ request, env }) {
       const send = (event, data) => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
-      const fullText = [];
+      let fullText = [];
       try {
         const { truncated, model, usage } = await streamCompletion(config, systemPrompt, userText, 4000, (piece) => {
           fullText.push(piece);
           send("chunk", { text: piece });
-        }, request.signal);
+        }, request.signal, () => {
+          // A new provider attempt is starting to stream. Discard anything a
+          // previously-failed attempt already emitted so the final parse and the
+          // client view don't concatenate a partial response with the new one.
+          fullText = [];
+          send("reset", {});
+        });
         if (truncated) {
           send("error", {
             error: "The model's response was cut off before it finished. Try a shorter prompt or a different model.",

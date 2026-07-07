@@ -7,6 +7,7 @@ import {
   resolveProviderConfig,
   callCompletion,
   enforceHostedRateLimit,
+  enforceByokRateLimit,
   validateImage,
   buildUserContent,
   verifyTurnstileToken,
@@ -59,6 +60,8 @@ export async function onRequestPost({ request, env }) {
     if (!String(body.api_key || "").trim()) {
       await verifyTurnstileToken(body, request, env);
       await enforceHostedRateLimit(env, request);
+    } else {
+      await enforceByokRateLimit(env, request);
     }
     ({ systemPrompt, userText } = buildOptimizePrompt(body, rawPrompt));
     if (body.image) {

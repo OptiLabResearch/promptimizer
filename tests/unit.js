@@ -1,0 +1,238 @@
+const assert = {
+  ok(val, message) {
+    if (!val) throw new Error(message || "Assertion failed");
+  }
+};
+import { ValidationError, RateLimitError, resolveProviderConfig, callCompletion, buildOptimizePrompt, buildRefinePassPrompt, parseDelimitedResponse, iterSseEvents, enforceHostedRateLimit, prepareRequest, verifyTurnstileToken } from "../functions/_lib/optimizer.js";
+
+function makeMockStream(chunks) {
+  let index = 0;
+  return {
+    getReader() {
+      return {
+        async read() {
+          if (index >= chunks.length) {
+            return { done: true, value: undefined };
+          }
+          const chunk = chunks[index++];
+          const encoder = new TextEncoder();
+          return { done: false, value: encoder.encode(chunk) };
+        },
+        releaseLock() {}
+      };
+    }
+  };
+}
+
+export async function runUnitTests() {
+  const results = [];
+  const runTest = async (name, fn) => {
+    try {
+      await fn();
+      results.push({ name, passed: true });
+    } catch (e) {
+      results.push({ name, passed: false, error: e.message });
+    }
+  };
+
+  await runTest("buildOptimizePrompt contains OUTCOME-FIRST", () => {
+    const { systemPrompt } = buildOptimizePrompt({}, "write a story");
+    assert.ok(systemPrompt.includes("OUTCOME-FIRST"), "System prompt should contain OUTCOME-FIRST");
+  });
+
+  await runTest("conditional CoT behavior (local target)", () => {
+    const { systemPrompt } = buildOptimizePrompt({ techniques: ["cot"], target_model: "local" }, "write a story");
+    assert.ok(
+      systemPrompt.includes("Add explicit step-by-step reasoning instructions (chain-of-thought)"),
+      "Local target with cot technique should request manual step-by-step reasoning instructions"
+    );
+  });
+
+  await runTest("conditional CoT behavior (non-local target)", () => {
+    const { systemPrompt } = buildOptimizePrompt({ techniques: ["cot"], target_model: "claude" }, "write a story");
+    assert.ok(
+      systemPrompt.includes("reasoning effort should be set via the API's reasoning/thinking parameter"),
+      "Non-local target with cot technique should suggest setting reasoning/thinking parameter"
+    );
+  });
+
+  await runTest("new claude target model guideline", () => {
+    const { systemPrompt } = buildOptimizePrompt({ target_model: "claude" }, "write a story");
+    assert.ok(
+      systemPrompt.includes("XML tags as the native delimiter dialect") &&
+      systemPrompt.includes("do NOT rely on assistant-prefill tricks"),
+      "Claude target guidelines should contain updated XML tag and prefill advice"
+    );
+  });
+
+  await runTest("new gpt target model guideline", () => {
+    const { systemPrompt } = buildOptimizePrompt({ target_model: "gpt" }, "write a story");
+    assert.ok(
+      systemPrompt.includes("Structure the prompt with markdown headers and lists rather than XML") &&
+      systemPrompt.includes("outcome-first is official doctrine"),
+      "GPT target guidelines should contain updated markdown and outcome-first advice"
+    );
+  });
+
+  await runTest("depth deep helper exists and returns instructions", () => {
+    const refine = buildRefinePassPrompt("raw story prompt", "first optimized story prompt");
+    assert.ok(typeof refine === "object" && refine.systemPrompt && refine.userText, "buildRefinePassPrompt should return systemPrompt and userText");
+    assert.ok(refine.systemPrompt.includes("<optimized_prompt>") && refine.systemPrompt.includes("<explanation>"), "refine pass systemPrompt must contain the two-block contract instructions");
+    assert.ok(refine.userText.includes("raw story prompt") && refine.userText.includes("first optimized story prompt"), "refine pass userText must contain the raw prompt and first-pass optimized prompt");
+  });
+
+  await runTest("system prompt does not contain NaN", () => {
+    const { systemPrompt } = buildOptimizePrompt({}, "write a story");
+    assert.ok(!systemPrompt.includes("NaN"), "System prompt should not contain NaN from operator syntax bugs");
+  });
+
+  await runTest("parseDelimitedResponse case-insensitive and robust to missing tags", () => {
+    const raw = "<OPTIMIZED_prompt>\nhello optimized\n<EXPLANATION>\nhello explanation";
+    const { optimizedText, explanationText } = parseDelimitedResponse(raw);
+    assert.ok(optimizedText === "hello optimized", "Should parse optimized prompt case-insensitively");
+    assert.ok(explanationText === "hello explanation", "Should parse explanation case-insensitively and handle missing closing tag");
+  });
+
+  await runTest("iterSseEvents handles LF and CRLF stream boundaries", async () => {
+    // 1. CRLF message stream
+    const crlfStream = makeMockStream([
+      "data: {\"piece\": 1}\r\n\r\n",
+      "data: {\"piece\": 2}\r\n\r\n"
+    ]);
+    const crlfResults = [];
+    for await (const event of iterSseEvents(crlfStream)) {
+      crlfResults.push(event.data);
+    }
+    assert.ok(crlfResults.length === 2, "Should parse 2 CRLF events");
+    assert.ok(crlfResults[0] === '{"piece": 1}', "Should decode first CRLF chunk content correctly");
+    assert.ok(crlfResults[1] === '{"piece": 2}', "Should decode second CRLF chunk content correctly");
+
+    // 2. LF message stream
+    const lfStream = makeMockStream([
+      "data: {\"piece\": 3}\n\n",
+      "data: {\"piece\": 4}\n\n"
+    ]);
+    const lfResults = [];
+    for await (const event of iterSseEvents(lfStream)) {
+      lfResults.push(event.data);
+    }
+    assert.ok(lfResults.length === 2, "Should parse 2 LF events");
+    assert.ok(lfResults[0] === '{"piece": 3}', "Should decode first LF chunk content correctly");
+  });
+
+  await runTest("parseDelimitedResponse reverse order tags and nested tags", () => {
+    const raw = "<EXPLANATION>\nthis is explanation\n</EXPLANATION>\n<OPTIMIZED_prompt>\nthis is optimized containing <explanation> nested tag\n</OPTIMIZED_prompt>";
+    const { optimizedText, explanationText } = parseDelimitedResponse(raw);
+    assert.ok(optimizedText === "this is optimized containing <explanation> nested tag", "Should parse optimized prompt with nested tags");
+    assert.ok(explanationText === "this is explanation", "Should parse explanation properly when it appears first");
+  });
+
+  await runTest("resolveProviderConfig rejects BYOK base_url pointing at private/link-local hosts", async () => {
+    const unsafeUrls = [
+      "http://169.254.169.254/latest/meta-data",
+      "http://127.0.0.1:8080/v1",
+      "http://10.0.0.5/v1",
+      "http://192.168.1.1/v1",
+      "http://172.16.0.1/v1",
+      "http://localhost/v1",
+      "http://localhost./v1",
+      "http://127.0.0.1./v1",
+      "http://metadata.google.internal/v1",
+      "http://[::1]/v1",
+      "ftp://example.com/v1",
+      "http://2130706433/v1",
+      "http://0177.0.0.1/v1",
+      "http://0x7f000001/v1",
+      "http://[::ffff:7f00:1]/v1",
+    ];
+    for (const base_url of unsafeUrls) {
+      let errorMsg = "";
+      try {
+        await resolveProviderConfig({ api_key: "key", provider: "custom", base_url, model: "m" }, {});
+      } catch (e) {
+        if (e instanceof ValidationError) errorMsg = e.message;
+      }
+      assert.ok(errorMsg, `Should reject unsafe base_url: ${base_url}`);
+    }
+  });
+
+  await runTest("resolveProviderConfig accepts a safe public BYOK base_url", async () => {
+    const config = await resolveProviderConfig(
+      { api_key: "key", provider: "custom", base_url: "https://api.example.com/v1", model: "m" },
+      {}
+    );
+    assert.ok(config.source === "byo", "Should resolve to the byo source");
+    assert.ok(config.attempts[0].baseUrl === "https://api.example.com/v1", "Should keep the safe base_url");
+  });
+
+  await runTest("resolveProviderConfig validation when key is missing and provider not hosted", async () => {
+    let errorMsg = "";
+    try {
+      await resolveProviderConfig({ provider: "nvidia" }, { HOSTED_PROVIDER: "google,openai" });
+    } catch (e) {
+      if (e instanceof ValidationError) errorMsg = e.message;
+    }
+    assert.ok(errorMsg.includes("API key is required for provider \"nvidia\""), "Should validate missing key for non-hosted provider");
+  });
+
+  await runTest("iterSseEvents yields remaining buffer without trailing double newline", async () => {
+    const stream = makeMockStream([
+      "data: {\"piece\": 5}\n\n",
+      "data: {\"piece\": 6}"
+    ]);
+    const results = [];
+    for await (const event of iterSseEvents(stream)) {
+      results.push(event.data);
+    }
+    assert.ok(results.length === 2, "Should yield 2 events, including the last one without trailing newlines");
+    assert.ok(results[1] === '{"piece": 6}', "Last event data should be yielded correctly");
+  });
+
+  await runTest("prepareRequest maps OpenAI multimodal images to Anthropic image blocks", () => {
+    const attempt = { mode: "anthropic", baseUrl: "https://api.anthropic.com", apiKey: "key", model: "claude-haiku-4-5" };
+    const userText = [
+      { type: "text", text: "What is this image?" },
+      { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5Erggg==" } }
+    ];
+    const req = prepareRequest(attempt, "system prompt", userText, 1000);
+    const content = req.body.messages[0].content;
+    assert.ok(Array.isArray(content), "Content should be an array");
+    assert.ok(content[0].type === "text" && content[0].text === "What is this image?", "First element should be text");
+    assert.ok(content[1].type === "image", "Second element should be type image");
+    assert.ok(content[1].source.type === "base64", "Source type should be base64");
+    assert.ok(content[1].source.media_type === "image/png", "Source media_type should be image/png");
+    assert.ok(content[1].source.data === "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5Erggg==", "Source data should match the base64 part");
+  });
+
+  await runTest("prepareRequest rejects unsupported HEIC/HEIF images for Anthropic", () => {
+    const attempt = { mode: "anthropic", baseUrl: "https://api.anthropic.com", apiKey: "key", model: "claude-haiku-4-5" };
+    const userText = [
+      { type: "text", text: "What is this image?" },
+      { type: "image_url", image_url: { url: "data:image/heic;base64,AAAAAAA=" } }
+    ];
+    let threw = false;
+    try {
+      prepareRequest(attempt, "system prompt", userText, 1000);
+    } catch (e) {
+      if (e instanceof ValidationError && e.message.includes("HEIC/HEIF")) threw = true;
+    }
+    assert.ok(threw, "Should throw ValidationError on HEIC/HEIF for Anthropic");
+  });
+
+  await runTest("verifyTurnstileToken throws on missing token", async () => {
+    let threw = false;
+    try {
+      await verifyTurnstileToken({}, { headers: new Map() }, { TURNSTILE_SECRET_KEY: "secret" });
+    } catch (e) {
+      if (e instanceof ValidationError && e.message.includes("Security verification")) threw = true;
+    }
+    assert.ok(threw, "Should throw ValidationError on missing token");
+  });
+
+  await runTest("verifyTurnstileToken bypasses when api_key is present", async () => {
+    // Should run without throwing since api_key is present (bypassing Turnstile)
+    await verifyTurnstileToken({ api_key: "my_key" }, {}, {});
+  });
+
+  return results;
+}

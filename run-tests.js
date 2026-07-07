@@ -1,4 +1,4 @@
-import { runUnitTests } from "./functions/api/optimize-prompt/test.js";
+import { runUnitTests } from "./tests/unit.js";
 
 console.log("Running unit tests...");
 const results = await runUnitTests();

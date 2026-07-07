@@ -1,6 +1,16 @@
+import { enforceByokRateLimit, RateLimitError } from "../_lib/optimizer.js";
+
 export async function onRequestPost({ request, env }) {
   if (!env.ANALYTICS) {
     return json({ ok: false, error: "Analytics Engine binding 'ANALYTICS' is not configured." }, 500);
+  }
+
+  try {
+    await enforceByokRateLimit(env, request);
+  } catch (e) {
+    if (e instanceof RateLimitError) {
+      return json({ ok: false, error: "Too many events — slow down." }, 429);
+    }
   }
 
   try {
@@ -18,10 +28,10 @@ export async function onRequestPost({ request, env }) {
         String(visitorId || "").substring(0, 100),
       ],
       doubles: [
-        typeof pasteToCopyTime === 'number' ? pasteToCopyTime : 0,
+        Number.isFinite(pasteToCopyTime) ? pasteToCopyTime : 0,
       ],
       indexes: [
-        String(visitorId || "").substring(0, 96),
+        "v1",
       ]
     });
 

@@ -137,6 +137,9 @@ const RATE_LIMIT_HOUR_WINDOW_SECONDS = 3600;
 const RATE_LIMIT_HOUR_MAX = 20;
 const RATE_LIMIT_LOCKOUT_SECONDS = 5 * 3600;
 
+const BYOK_RATE_LIMIT_MINUTE_MAX = 30;
+const BYOK_RATE_LIMIT_HOUR_MAX = 300;
+
 const BYOK_HINT = "or add your own free API key in Settings — visit https://freellm.net/ for a list of current free-tier LLM API keys and instructions on how to get one.";
 
 async function bumpRateLimitCount(cache, request, ttlSeconds) {
@@ -162,6 +165,13 @@ async function bumpRateLimitCount(cache, request, ttlSeconds) {
 // resetting on the next window. Uses the same Cache API mechanism as the
 // circuit breaker above, so it needs no extra bindings; fails open if the
 // Cache API isn't available (e.g. local dev) or errors.
+//
+// LIMITATION (IMPORTANT): caches.default is per-datacenter (per-colo). An
+// attacker spread across colos gets these limits PER colo, not globally, and
+// the lockout is also colo-local. This is a speed bump, not a real quota guard.
+// For a global limit, front these endpoints with a Cloudflare WAF rate-limiting
+// rule (see .review/cloudflare-waf-rate-limit.md) or move counters to KV / a
+// Durable Object.
 export async function enforceHostedRateLimit(env, request) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
 
@@ -203,6 +213,36 @@ export async function enforceHostedRateLimit(env, request) {
   } catch (e) {
     if (e instanceof RateLimitError) throw e;
     // Fail open on cache errors so the rate limiter itself never breaks the app.
+  }
+}
+
+// Lighter always-on per-IP guard for BYOK requests. These spend the caller's
+// own key, so the cap is generous — its only job is to stop the endpoint being
+// used as a free anonymizing relay. Fails open on cache errors, like the hosted
+// limiter. NOTE: like the hosted limiter, this is per-colo (Cache API is local
+// to each datacenter); it is a speed bump, not a global guarantee. See TASK 8.
+export async function enforceByokRateLimit(env, request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  try {
+    if (typeof caches === "undefined" || !caches.default) return;
+    const cache = caches.default;
+
+    const minuteWindow = Math.floor(Date.now() / (RATE_LIMIT_MINUTE_WINDOW_SECONDS * 1000));
+    const hourWindow = Math.floor(Date.now() / (RATE_LIMIT_HOUR_WINDOW_SECONDS * 1000));
+    const minuteReq = new Request(`${RATE_LIMIT_CACHE_PREFIX}byok-min-${ip}-${minuteWindow}`);
+    const hourReq = new Request(`${RATE_LIMIT_CACHE_PREFIX}byok-hour-${ip}-${hourWindow}`);
+
+    const [minuteCount, hourCount] = await Promise.all([
+      bumpRateLimitCount(cache, minuteReq, RATE_LIMIT_MINUTE_WINDOW_SECONDS),
+      bumpRateLimitCount(cache, hourReq, RATE_LIMIT_HOUR_WINDOW_SECONDS),
+    ]);
+
+    if (hourCount > BYOK_RATE_LIMIT_HOUR_MAX || minuteCount > BYOK_RATE_LIMIT_MINUTE_MAX) {
+      throw new RateLimitError("Too many requests — please slow down and try again shortly.");
+    }
+  } catch (e) {
+    if (e instanceof RateLimitError) throw e;
+    // Fail open on cache errors.
   }
 }
 
@@ -546,7 +586,7 @@ async function fetchActiveModelsForProvider(provider, baseUrl, apiKey) {
     const tId = setTimeout(() => controller.abort(), 5000);
     let resp;
     try {
-      resp = await fetch(url, { headers, signal: controller.signal });
+      resp = await fetch(url, { headers, signal: controller.signal, redirect: "error" });
     } finally {
       clearTimeout(tId);
     }
@@ -717,6 +757,12 @@ function assertSafeBaseUrl(rawUrl) {
     isIPv6 = true;
   } else if (hostname.includes(":")) {
     isIPv6 = true;
+  }
+
+  // Strip a single FQDN trailing dot so "localhost." / "metadata.google.internal."
+  // can't bypass the exact-match blocklist below.
+  if (hostname.endsWith(".")) {
+    hostname = hostname.slice(0, -1);
   }
 
   if (hostname === "localhost" || hostname === "metadata.google.internal") {
@@ -1000,6 +1046,7 @@ async function executeWithFallback(config, systemPrompt, userText, maxTokens, st
         headers,
         body: JSON.stringify(body),
         signal: controller.signal,
+        redirect: "error",
       });
 
       if (!resp.ok) {
@@ -1076,9 +1123,10 @@ export async function callCompletion(config, systemPrompt, userText, maxTokens =
   });
 }
 
-export async function streamCompletion(config, systemPrompt, userText, maxTokens = 4000, onChunk, signal = null) {
+export async function streamCompletion(config, systemPrompt, userText, maxTokens = 4000, onChunk, signal = null, onAttemptStart = null) {
   return executeWithFallback(config, systemPrompt, userText, maxTokens, true, signal, async (resp, attempt, resetTimeout, executionSignal) => {
     if (!resp.body) throw new Error("Response body is null");
+    if (onAttemptStart) onAttemptStart();
     let truncated = false;
     let usage = null;
 
@@ -1185,7 +1233,19 @@ export async function verifyTurnstileToken(body, request, env) {
 
   const secretKey = env.TURNSTILE_SECRET_KEY;
   if (!secretKey) {
-    console.warn("TURNSTILE_SECRET_KEY is not defined in environment variables. Bypassing validation.");
+    // Only bypass when the instance has no shared keys to protect (local dev /
+    // a fork with no secrets). If HOSTED_PROVIDER keys exist, a missing
+    // Turnstile secret is a misconfiguration — fail closed rather than silently
+    // disabling bot protection on the shared keys.
+    const hasHostedKey = String(env.HOSTED_PROVIDER || "")
+      .split(",")
+      .map((p) => p.trim().toUpperCase().replace(/[^A-Z0-9]/g, "_"))
+      .filter(Boolean)
+      .some((p) => env[`${p}_API_KEY`] || env[`${p}_KEY`]);
+    if (hasHostedKey) {
+      throw new Error("Bot verification is misconfigured (missing TURNSTILE_SECRET_KEY).");
+    }
+    console.warn("TURNSTILE_SECRET_KEY is not defined; no hosted keys present, bypassing validation.");
     return;
   }
 

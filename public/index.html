@@ -2430,7 +2430,7 @@
         <div class="form-field" id="settingsApiKeyGroup" style="display:none;">
           <label for="settingsApiKey">API key</label>
           <input class="form-input" type="password" id="settingsApiKey" placeholder="sk-...">
-          <span class="form-hint">Stored only in your browser (localStorage), sent directly to the provider per-request. Never touches our server logs.</span>
+          <span class="form-hint">Stored only in your browser (localStorage). Sent per-request through this app's Cloudflare Function to the provider; it is never stored or logged on our servers.</span>
           <span class="form-hint" id="settingsFreeKeyHint" style="display:none; margin-top:6px;"></span>
         </div>
         <div class="form-field" id="settingsModelGroup" style="display:none;">
@@ -4108,6 +4108,9 @@
                 if (eventLine === 'chunk' && evt.text) {
                   accumulated += evt.text;
                   rawView.textContent = accumulated;
+                } else if (eventLine === 'reset') {
+                  accumulated = '';
+                  rawView.textContent = '';
                 } else if (eventLine === 'done') {
                   status = 'done';
                   setCtaLoading(false);
