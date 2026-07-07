@@ -10,6 +10,17 @@ compatibility_date = "2024-09-23"
 #                         `wrangler pages secret put GOOGLE_API_KEY`
 #                         and paste the key when prompted — never in this file)
 #
+#   STATS_TOKEN              — required to view /api/stats (passed as
+#                              ?token=... or an X-Stats-Token header). If
+#                              unset, /api/stats is public — set this before
+#                              deploying.
+#   CLOUDFLARE_API_TOKEN     — used by /api/stats to query the Analytics
+#                              Engine SQL API. Needs "Account Analytics: Read"
+#                              permission; create at
+#                              dash.cloudflare.com/profile/api-tokens
+#   CLOUDFLARE_ACCOUNT_ID    — the Cloudflare account id that owns the
+#                              `prompt_optimizer_events` dataset below.
+#
 # Plain vars for the hosted instance (safe to set in the Cloudflare dashboard):
 #   HOSTED_PROVIDER          = comma-separated provider list, tried in order
 #                              if every model on one provider errors out.

@@ -2737,9 +2737,11 @@
   <div class="mobile-menu-scrim" id="mobileMenuScrim"></div>
 
   <script>
-    (function () {
-      // ---------- Anonymous Event Tracking (Cloudflare Analytics Engine) ----------
-      var VISITOR_KEY = 'prompt_optimizer_visitor_id';
+    // ---------- Anonymous Event Tracking (Cloudflare Analytics Engine) ----------
+    // Declared at top-level script scope (not inside an IIFE) so the
+    // `track()` helper and its state are visible to the click handlers
+    // wired up inside the IIFE below.
+    var VISITOR_KEY = 'prompt_optimizer_visitor_id';
       var visitorId = localStorage.getItem(VISITOR_KEY);
       if (!visitorId) {
         visitorId = generateUUID();
@@ -2813,7 +2815,6 @@
           localStorage.setItem(THEME_KEY, 'dark');
         }
       });
-    })();
 
     (function () {
       var OPTIONS_KEY = 'promptOptimizerOptionsOpen';

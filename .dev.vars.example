@@ -12,3 +12,15 @@ NVIDIA_API_KEY=
 
 # OpenRouter API Key
 OPENROUTER_API_KEY=
+
+# Cloudflare API Token with "Account Analytics: Read" permission — used by
+# /api/stats to query the Analytics Engine SQL API. Create at
+# dash.cloudflare.com/profile/api-tokens
+CLOUDFLARE_API_TOKEN=
+
+# Cloudflare account id that owns the `prompt_optimizer_events` dataset
+CLOUDFLARE_ACCOUNT_ID=
+
+# Token required to view /api/stats (?token=... or X-Stats-Token header).
+# If unset, /api/stats is public.
+STATS_TOKEN=
